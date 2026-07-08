@@ -15,10 +15,16 @@ interface LayoutProps {
 }
 
 export default async function ProjectLayout({ children, params }: LayoutProps) {
-  const { slug } = await params;
+  // params.slug arrives still URL-encoded (e.g. "Peg%20Slideshow"). Decode it
+  // once here and pass the clean value to every child — they each re-encode
+  // it exactly once when building hrefs/fetch URLs. Passing the raw encoded
+  // value down caused double-encoding (404s) for any project name with a
+  // space or other special character.
+  const { slug: rawSlug } = await params;
+  const slug = decodeSlug(rawSlug);
   const cwd = await resolveExistingProjectCwd(slug);
   if (!cwd) notFound();
-  const name = decodeSlug(slug);
+  const name = slug;
 
   return (
     <div className="flex flex-col h-full">

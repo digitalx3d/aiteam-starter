@@ -11,11 +11,16 @@ import { getConfig } from "./config";
  *
  * Claude Code stores session logs at:
  *   <home>/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl
- * where <encoded-cwd> replaces `:`, `\`, `/` in the absolute cwd with `-`.
+ * where <encoded-cwd> replaces every non-alphanumeric character in the
+ * absolute cwd with `-` (one hyphen per character, not collapsed) — e.g.
+ * "Z:\Github\Peg Slideshow" -> "Z--Github-Peg-Slideshow". Replacing only
+ * `:`, `\`, `/` (as this used to) leaves spaces and other punctuation
+ * untouched, so any project whose folder name isn't plain alphanumeric
+ * silently never finds its session log.
  */
 
 function encodeCwdForClaudeCode(cwd: string): string {
-  return cwd.replace(/[:/\\]/g, "-");
+  return cwd.replace(/[^a-zA-Z0-9]/g, "-");
 }
 
 export function sessionLogPath(cwd: string, sessionId: string): string {

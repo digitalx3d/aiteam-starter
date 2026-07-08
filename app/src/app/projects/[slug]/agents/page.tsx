@@ -1,6 +1,7 @@
 import { listTickets } from "@/lib/dispatch-store";
 import { discoverAgents } from "@/lib/agents";
 import { ProjectAgents } from "@/components/project-agents";
+import { decodeSlug } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,11 @@ interface PageProps {
 const MAX_FINISHED_SEED = 20;
 
 export default async function ProjectAgentsPage({ params }: PageProps) {
-  const { slug } = await params;
+  // Decode once here: ticket.project is stored decoded (e.g. "Peg Slideshow"),
+  // so comparing it against the raw encoded params.slug below would silently
+  // never match for project names with spaces or other special characters.
+  const { slug: rawSlug } = await params;
+  const slug = decodeSlug(rawSlug);
   const [allTickets, agents] = await Promise.all([
     listTickets(),
     discoverAgents(),
