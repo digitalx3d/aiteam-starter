@@ -10,9 +10,24 @@
 //   pm2 start Z:\GitHub\aiTeam\scripts\tunnel-watchdog.mjs --name tunnel-watchdog
 //   pm2 save
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const PORT = "3900";
+// Dashboard port: ~/.aiteam/settings.json appPort > PORT env > 3900 —
+// the same resolution the dispatch courier and ecosystem.config.js use.
+function resolvePort() {
+  try {
+    const s = JSON.parse(
+      readFileSync(join(homedir(), ".aiteam", "settings.json"), "utf8")
+    );
+    if (s.appPort) return String(s.appPort);
+  } catch {
+    /* fall through */
+  }
+  return String(process.env.PORT || "3900");
+}
+const PORT = resolvePort();
 const INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const TS = existsSync("C:/Program Files/Tailscale/tailscale.exe")
   ? "C:/Program Files/Tailscale/tailscale.exe"

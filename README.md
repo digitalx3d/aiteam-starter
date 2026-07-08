@@ -54,8 +54,9 @@ cd aiteam
 node setup.mjs
 ```
 
-The setup script checks prerequisites, asks four questions (your name + three
-folders), and then:
+The setup script checks prerequisites, asks five questions (your name, three
+folders, and a port — it defaults to 3900 and warns you if that port is already
+taken on your machine), and then:
 
 - writes your config to `~/.aiteam/settings.json` (editable later on the dashboard's
   **Settings** page),
@@ -74,8 +75,12 @@ cd app
 npm run dev
 ```
 
-Open http://localhost:3900, visit the **Team** page to meet everyone, and say hello to
-CVB on the Dashboard.
+Open http://localhost:3900 (or the port you chose), visit the **Team** page to meet
+everyone, and say hello to CVB on the Dashboard.
+
+The port lives in `~/.aiteam/settings.json` as `appPort`; the app scripts, pm2
+config, dispatch courier, and tunnel watchdog all follow it, so there is exactly
+one place to change it later.
 
 ## How it fits together
 
@@ -105,7 +110,7 @@ Remote access from your phone, without opening ports, via
 [Tailscale](https://tailscale.com) (free for personal use): install it, sign in, then
 
 ```bash
-tailscale serve --bg --https 443 http://localhost:3900
+tailscale serve --bg --https 443 http://localhost:3900   # use your port if you changed it
 ```
 
 Tailscale's HTTPS tunnel state can be silently lost on service restarts. The watchdog

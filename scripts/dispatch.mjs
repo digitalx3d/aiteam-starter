@@ -12,6 +12,8 @@
 //   node scripts/dispatch.mjs --agent devin --project my-app --brief-file brief.md
 
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 function parseArgs(argv) {
   const out = {};
@@ -51,14 +53,27 @@ if (!brief) {
   process.exit(2);
 }
 
-// Default to 3900 — the aiTeam dashboard's reserved port (see
-// Z:\GitHub\vault\team\rules.md "Reserved ports"). Was 3000 until 2026-05-29,
+// Dashboard port resolution: DISPATCH_URL wins outright, then
+// ~/.aiteam/settings.json appPort (the installed port), then the PORT env
+// var, then 3900 — the aiTeam dashboard's reserved default (see
+// vault/team/rules.md "Reserved ports"). History: was 3000 until 2026-05-29,
 // when clearing the machine-level PORT=3900 env var (Devin's 5/20 footgun fix)
 // silently broke this fallback because $PORT was empty and the script fell
-// through to 3000 where nothing was listening.
+// through to 3000 where nothing was listening. settings.json outranks PORT
+// for the same reason: it is explicit and per-install, not ambient.
+function resolvePort() {
+  try {
+    const s = JSON.parse(
+      readFileSync(join(homedir(), ".aiteam", "settings.json"), "utf8")
+    );
+    if (s.appPort) return String(s.appPort);
+  } catch {
+    /* fall through */
+  }
+  return String(process.env.PORT || 3900);
+}
 const url =
-  process.env.DISPATCH_URL ||
-  `http://localhost:${process.env.PORT || 3900}/api/dispatch`;
+  process.env.DISPATCH_URL || `http://localhost:${resolvePort()}/api/dispatch`;
 
 const body = {
   agent: String(flags.agent),

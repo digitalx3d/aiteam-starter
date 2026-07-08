@@ -55,6 +55,11 @@ export function getConfig() {
       process.env[field.env] ||
       field.def();
   }
+  // appPort (set by the starter's setup.mjs) shifts the default appUrl; an
+  // explicit appUrl (settings or env) still wins above.
+  if (!saved.appUrl && !process.env.AITEAM_APP_URL && saved.appPort) {
+    cfg.appUrl = `http://localhost:${String(saved.appPort)}`;
+  }
   cfg.indexDir = path.join(cfg.vaultDir, ".index");
   cfg.dbPath = path.join(cfg.indexDir, "index.db");
   return cfg;

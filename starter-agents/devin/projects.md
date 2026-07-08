@@ -12,7 +12,8 @@ once filled in.]
 
 ### aiTeam — the team dashboard
 - The team's control-center web app at `{{AITEAM_DIR}}\app\` running on
-  localhost:3900. The Dashboard, Projects, Team, activity feed.
+  the port in `~/.aiteam/settings.json` (`appPort`, default 3900). The
+  Dashboard, Projects, Team, activity feed.
 - Project context: `{{AITEAM_DIR}}\.aiteam\project-context.md`
 - Your overrides: `{{AITEAM_DIR}}\.aiteam\agents\devin.md` (create
   when needed)

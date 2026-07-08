@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import net from "node:net";
 import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -60,8 +61,18 @@ function checkPrereqs() {
   }
 }
 
+/** True if nothing is currently listening on the port. */
+function portIsFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", () => resolve(false));
+    srv.once("listening", () => srv.close(() => resolve(true)));
+    srv.listen(port, "0.0.0.0");
+  });
+}
+
 // ---------- 2. questions ----------
-async function askQuestions() {
+async function askQuestions(existingSettings) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (q, def) => {
     const a = (await rl.question(`${q}${def ? ` [${def}]` : ""}: `)).trim();
@@ -86,8 +97,35 @@ async function askQuestions() {
     "Personas folder — where agent personalities live",
     path.join(os.homedir(), ".claude", "agents")
   );
+
+  // Dashboard port. Everything (the app, the dispatch courier, pm2, the
+  // tunnel watchdog) follows this one setting, so picking a free port here
+  // is all it takes when 3900 is already occupied on this machine.
+  let appPort = 0;
+  while (!appPort) {
+    const raw = await ask(
+      "Dashboard port",
+      String(existingSettings.appPort || 3900)
+    );
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1024 || n > 65535) {
+      console.log("  Pick a whole number between 1024 and 65535.");
+      continue;
+    }
+    if (!(await portIsFree(n))) {
+      const answer = (
+        await rl.question(
+          `  Something is already listening on ${n}. Use it anyway (it might be your own aiTeam)? [y/N]: `
+        )
+      )
+        .trim()
+        .toLowerCase();
+      if (answer !== "y" && answer !== "yes") continue;
+    }
+    appPort = n;
+  }
   rl.close();
-  return { ownerName, projectsRoot, vaultDir, agentsDir };
+  return { ownerName, projectsRoot, vaultDir, agentsDir, appPort };
 }
 
 // ---------- token rendering ----------
@@ -136,28 +174,41 @@ function seedPath(src, dest, tokens) {
 
 // ---------- main ----------
 checkPrereqs();
-const answers = await askQuestions();
-const tokens = makeTokens(answers);
-const first = tokens["{{OWNER_FIRST}}"];
-
-// 3. settings file (merge; existing keys win only if we have nothing new to say)
-console.log("\nWriting config...");
 let settings = {};
 try {
   settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
 } catch {
   /* fresh install */
 }
+const answers = await askQuestions(settings);
+const tokens = makeTokens(answers);
+const first = tokens["{{OWNER_FIRST}}"];
+
+// 3. settings file (merged over anything already there)
+console.log("\nWriting config...");
 Object.assign(settings, {
   ownerName: answers.ownerName,
   projectsRoot: answers.projectsRoot,
   vaultDir: answers.vaultDir,
   agentsDir: answers.agentsDir,
   aiteamDir: REPO,
+  appPort: String(answers.appPort),
 });
 fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
 fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + "\n", "utf8");
 ok(`${SETTINGS_FILE} (change any of this later on the dashboard's Settings page)`);
+
+// 3b. The app's dev/start scripts carry the port literally (npm scripts can't
+// read the settings file). pm2, the dispatch courier, and the tunnel watchdog
+// all resolve settings.json themselves — this rewrite is only for `npm run
+// dev` / `npm run start`.
+const pkgPath = path.join(REPO, "app", "package.json");
+const pkgRaw = fs.readFileSync(pkgPath, "utf8");
+const pkgNew = pkgRaw.replace(/--port \d+/g, `--port ${answers.appPort}`);
+if (pkgNew !== pkgRaw) {
+  fs.writeFileSync(pkgPath, pkgNew, "utf8");
+  ok(`app/package.json dev/start scripts set to port ${answers.appPort}`);
+}
 
 // 4. vault scaffold
 for (const d of ["team", "transcripts", "decisions", "agents", "projects"]) {
@@ -245,7 +296,7 @@ if (doInstall === "" || doInstall === "y" || doInstall === "yes") {
 console.log(`
 Done, ${first}. Next steps:
 
-  1. cd app && npm run dev        then open http://localhost:3900
+  1. cd app && npm run dev        then open http://localhost:${answers.appPort}
   2. Meet the team on the Team page; talk to Claude Von Braun on the Dashboard.
   3. Image generation (Maya) needs API keys — put OPENAI_API_KEY and/or
      GEMINI_API_KEY in the .env file at the repo root. Skip if you won't use her.
