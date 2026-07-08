@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* Use class-based dark variant so we can force dark always (html.dark on root). */
+@custom-variant dark (&:is(.dark, .dark *));
+
+:root {
+  /* Dark gray base — RGB ~80, "value 80" range. Premium dark, not OLED black. */
+  --background: #4d4d4d;
+  --foreground: #f3f3f3;
+  --muted: #b0b0b0;
+  --muted-bg: #5e5e5e;
+  --user-bg: #3a3a3a;          /* recessed — for John's chat posts, distinct from base + sidebars */
+  --cards-bg: #282828;         /* dashboard panel — value ~40 */
+  --card-bg: #3a3a3a;          /* individual card surface — subtle elevation above panel */
+  --border: #6e6e6e;
+
+  /* Bright orange — primary accent (CTAs, send button, focus rings). */
+  --accent: #fb923c;          /* orange-400 */
+  --accent-fg: #1a1a1a;       /* dark text on orange */
+
+  /* Bright yellow — secondary accent (highlights, active states). */
+  --accent-2: #facc15;        /* yellow-400 */
+  --accent-2-fg: #1a1a1a;
+
+  /* Errors / destructive. */
+  --error: #ef4444;           /* rose-500 — passes AA-large on dark gray and on white-text bg */
+  --error-bg: #4a1f1f;
+
+  /* Tool-call blocks / code blocks — slightly elevated panels. */
+  --tool-bg: #585858;
+  --tool-border: #757575;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-bg: var(--muted-bg);
+  --color-user-bg: var(--user-bg);
+  --color-cards-bg: var(--cards-bg);
+  --color-card-bg: var(--card-bg);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-fg: var(--accent-2-fg);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
+  --color-tool-bg: var(--tool-bg);
+  --color-tool-border: var(--tool-border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Subtle scrollbar, themed. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* PWA Window Controls Overlay: drag region across the top of the window.
+   Hidden when running in a normal browser tab or in plain standalone mode;
+   becomes a thin draggable strip only when WCO is active. Buttons/links
+   inside the app are not affected — they keep their own pointer behavior. */
+.pwa-titlebar {
+  display: none;
+}
+@media (display-mode: window-controls-overlay) {
+  .pwa-titlebar {
+    display: block;
+    height: env(titlebar-area-height, 33px);
+    width: 100%;
+    background: var(--cards-bg);
+    -webkit-app-region: drag;
+    app-region: drag;
+    flex-shrink: 0;
+    user-select: none;
+  }
+}

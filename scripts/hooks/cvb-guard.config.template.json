@@ -1,0 +1,47 @@
+{
+  "_comment": "TEMPLATE for cvb-guard.config.json — the CVB (Claude Von Braun) PreToolUse bouncer. setup.mjs renders this by replacing the {{PLACEHOLDER}} tokens with your real paths (lowercase, forward slashes) and writing cvb-guard.config.json next to it. CVB may write COORDINATION artifacts, never DELIVERABLES, and never GOVERNANCE files. Tune behavior by editing the rendered file; no code changes needed. All path checks are case-insensitive and forward-slash-normalized.",
+
+  "_writeAllow": "Paths CVB MAY Edit/Write. prefixes = startsWith; contains = substring; exact = full match.",
+  "writeAllowPrefixes": [
+    "{{AGENTS_DIR}}/claude/",
+    "{{VAULT_DIR}}/"
+  ],
+  "writeAllowContains": [
+    "/.aiteam/"
+  ],
+  "writeAllowExact": [
+    "{{AITEAM_DIR}}/inbox-shared.md"
+  ],
+
+  "_writeAllowRegex": "Case-insensitive regex allow-patterns (matched against the normalized path). Covers CVB's own memory under any per-scope .claude/projects/<scope>/memory/ dir (his memory path varies by which chat he's in).",
+  "writeAllowRegex": [
+    "\\.claude/projects/[^/]+/memory/"
+  ],
+
+  "_writeDeny": "Governance files CVB may NEVER write, even if an allow rule would match. Changing personas or team rules needs the owner's go-ahead. basenames = exact filename; contains = substring (protects vault/team canon).",
+  "writeDenyBasenames": [
+    "soul.md",
+    "agents.md",
+    "tools.md",
+    "heartbeat.md",
+    "projects.md",
+    "security-checklist.md",
+    "style-brief.md"
+  ],
+  "writeDenyContains": [
+    "/vault/team/"
+  ],
+
+  "_bashDeny": "Bash is default-ALLOW. Ordinary git writes (add/commit/merge/checkout/plain push), builds, pm2, and deploy scripts are ALLOWED — CVB runs commits and deployments for reviewed work. Still DENIED: git history surgery (rebase/reset/clean/cherry-pick/am/apply), force or delete pushes, amended commits, package publishing, image-gen python, and raw file mutation (rm/mv/cp). firstToken = the executable name of any command segment; regex = matched against each quote-stripped segment (case-insensitive).",
+  "bashDenyFirstToken": [
+    "rm", "del", "erase", "rmdir", "rd", "move", "mv", "cp", "copy", "robocopy", "xcopy",
+    "python", "python3", "py"
+  ],
+  "bashDenyRegex": [
+    "git\\s+(rebase|reset|clean|cherry-pick|am|apply)\\b",
+    "git\\s+push\\b.*(--force|--delete|\\s-f\\b|\\s-d\\b)",
+    "git\\s+commit\\b.*--amend",
+    "(npm|pnpm|yarn)\\s+(run\\s+)?publish\\b",
+    "\\bgenerate\\w*\\.py\\b"
+  ]
+}

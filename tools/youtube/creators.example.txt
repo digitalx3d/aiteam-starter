@@ -1,0 +1,5 @@
+# Your tracked AI YouTube creators. Format: Name | channel_url
+# This is the input list for the scout agent's recurring channel scan.
+# Copy this file to creators.txt and edit with your own channels.
+Example Creator     | https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxx
+Another Creator     | https://www.youtube.com/channel/UCyyyyyyyyyyyyyyyyyyyy

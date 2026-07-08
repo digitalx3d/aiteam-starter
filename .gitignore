@@ -1,0 +1,117 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node (in case we pick up JS tooling later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Build / artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# Agent runtime artifacts (kept local, not committed)
+agents/*/screenshots/
+agents/*/cache/
+agents/*/rejected/
+
+# Agent runtime state — files that mutate every time an agent works
+agents/*/inbox.md
+agents/*/now.md
+agents/*/plan-current.md
+agents/*/completed.md
+agents/live-feed.jsonl
+agents/maya/spend-log.json
+agents/maya/portrait-batch-summary.json
+agents/maya/article_briefs/
+agents/maya/charts/
+agents/maya/test_charts/
+
+# Tool intermediate outputs (transcripts kept locally as research artifacts)
+tools/youtube/out/*.json
+tools/youtube/out/*.txt
+
+# Personal scout inputs — keep .example version in git, ignore the real one
+tools/youtube/creators.txt
+
+# Ad-hoc batch runners (personal one-off scripts with hardcoded paths/video lists)
+tools/youtube/_run_*.py
+
+# Personal runtime state — keep .example versions in git, ignore the real ones
+big3.md
+big5.md
+inbox-shared.md
+
+# Local Claude Code settings (per Claude Code convention)
+.claude/settings.local.json
+
+# Dispatch runtime state — mutates on every agent dispatch
+app/.dispatches/
+
+# War Room runtime state — live brainstorm sessions, mutates per session
+app/.warroom/
+
+# Warm worker pool — per (agent,project) session registry, mutates on every dispatch
+app/.warm-pool/
+
+# Auto-handoff kill switch — local toggle (create to enable, delete to disable)
+.auto-handoff-enabled
+
+# Project-override data — track the folder structure (.gitkeep), keep the
+# actual personas / project context / task content local. Never commit personas;
+# the full engine/data split + history scrub happens at v2 Step 4.
+.aiteam/agents/*
+!.aiteam/agents/.gitkeep
+.aiteam/tasks/*
+!.aiteam/tasks/.gitkeep
+.aiteam/project-context.md
+
+# Avatar candidates staged during generation (final picks are committed alongside)
+app/public/avatars/staged/
+
+# Ad-hoc screenshots dropped at the repo root
+/*.png
+
+# CVB's in-flight status file at the repo root — runtime state, mutates constantly
+/now.md
+
+# Images pasted/generated in dashboard chats — runtime artifacts, kept local
+chat-images/
+
+# CVB guard config is generated per machine by setup.mjs from the .template.json
+scripts/hooks/cvb-guard.config.json
+
