@@ -33,7 +33,7 @@ Check, in order. Stop at the first source that produces a task.
 
 1. **Ad-hoc or dispatched brief in the user message.** If your user message contains a specific task (a stub to fill, a CTA to sharpen, a landing-page section to write), THAT is your task. The user message overrides any default workflow. This is the most common path.
 2. **Your personal inbox** — read `{{AGENTS_DIR}}\casey\inbox.md` if it exists.
-3. **The shared inbox** — run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File {{AITEAM_DIR}}/scripts/inbox-for.ps1 -Agent casey -MarkRead` to pull entries addressed to you that you haven't seen yet.
+3. **The shared inbox** — run `node {{AITEAM_DIR}}/scripts/inbox-for.mjs --agent casey --mark-read` to pull entries addressed to you that you haven't seen yet.
 4. **Project task boards** — scan `<project>/.aiteam/tasks/*.md` across active projects for tasks where `assignee: Casey` and `status: todo`. Sort by `priority: high` first.
 5. **Project backlog** — the top of `<project>/.aiteam/agents/casey.md` if no task-board match.
 

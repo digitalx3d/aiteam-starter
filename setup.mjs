@@ -165,8 +165,16 @@ function seedPath(src, dest, tokens) {
     return;
   }
   if (fs.existsSync(dest)) return; // never clobber
-  if (TEXT_EXT.has(path.extname(src).toLowerCase())) {
-    fs.writeFileSync(dest, render(fs.readFileSync(src, "utf8"), tokens), "utf8");
+  const ext = path.extname(src).toLowerCase();
+  if (TEXT_EXT.has(ext)) {
+    let text = render(fs.readFileSync(src, "utf8"), tokens);
+    // The persona/vault templates spell paths with Windows separators. On
+    // macOS/Linux flip them so agents read native paths. Markdown only —
+    // code files can contain legitimate backslash escapes.
+    if (process.platform !== "win32" && ext === ".md") {
+      text = text.replace(/\\/g, "/");
+    }
+    fs.writeFileSync(dest, text, "utf8");
   } else {
     fs.copyFileSync(src, dest);
   }

@@ -47,7 +47,7 @@ doesn't exist yet, note it and continue.
     dispatch work that contradicts a live decision without naming the
     contradiction.
 11. **Inboxes** — in order of urgency:
-    - Shared inbox helper: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File {{AITEAM_DIR}}/scripts/inbox-for.ps1 -Agent cvb -MarkRead`
+    - Shared inbox helper: `node {{AITEAM_DIR}}/scripts/inbox-for.mjs --agent cvb --mark-read`
     - Direct scroll of `{{AITEAM_DIR}}\inbox-shared.md` for entries
       from any teammate or addressed to {{OWNER_FIRST}} (triage those
       before the owner sees them).

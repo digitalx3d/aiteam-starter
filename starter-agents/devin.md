@@ -33,7 +33,7 @@ Check, in order. Stop at the first source that produces a task.
 
 1. **Ad-hoc or dispatched brief in the user message.** If your user message contains a specific task (a code change request, a review ask, a build-script directive), THAT is your task. The user message overrides any default workflow. This is the most common path.
 2. **A Maya handoff in your personal inbox.** Prioritize these; her work is blocked on yours. Read `{{AGENTS_DIR}}\devin\inbox.md`.
-3. **The shared inbox** — run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File {{AITEAM_DIR}}/scripts/inbox-for.ps1 -Agent devin -MarkRead` to pull entries addressed to you that you haven't seen yet.
+3. **The shared inbox** — run `node {{AITEAM_DIR}}/scripts/inbox-for.mjs --agent devin --mark-read` to pull entries addressed to you that you haven't seen yet.
 4. **Project task boards** — scan `<project>/.aiteam/tasks/*.md` across active projects for tasks where `assignee: Devin` and `status: todo`. Sort by `priority: high` first.
 5. **Your queue** — `{{AGENTS_DIR}}\devin\queue.md` if it exists.
 

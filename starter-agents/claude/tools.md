@@ -24,7 +24,7 @@ of preference:
   the built-in `Agent`/`Task` subagent tool is NOT it (see the next
   bullet). The only mechanism is running this command via Bash. It is
   non-blocking: it spawns the teammate as a separate top-level
-  claude.exe with their full persona and returns a ticket ID in
+  claude process with their full persona and returns a ticket ID in
   milliseconds. The worker runs as its own OS process, so it survives
   even if this chat or window closes. The Dashboard chat stays
   unlocked for {{OWNER_FIRST}} while it runs, and the worker reports

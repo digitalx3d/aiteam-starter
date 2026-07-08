@@ -29,9 +29,11 @@ function resolvePort() {
 }
 const PORT = resolvePort();
 const INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const TS = existsSync("C:/Program Files/Tailscale/tailscale.exe")
-  ? "C:/Program Files/Tailscale/tailscale.exe"
-  : "tailscale";
+const TS =
+  [
+    "C:/Program Files/Tailscale/tailscale.exe",
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+  ].find((p) => existsSync(p)) || "tailscale";
 
 const stamp = () => new Date().toISOString();
 

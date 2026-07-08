@@ -43,8 +43,9 @@ edges. Read "Sharp edges" before you judge it.
 - Optional, only for Maya's image generation: an `OPENAI_API_KEY` and/or
   `GEMINI_API_KEY`
 - Optional, for the War Room's outside consultants: an `OPENROUTER_API_KEY`
-- Developed and daily-driven on **Windows 11**; should run on macOS/Linux but expect
-  friction (see "Sharp edges").
+- **Windows 11 or macOS.** Developed and daily-driven on Windows; the macOS path
+  is hardened (native folder-open, no PowerShell dependency, paths normalized at
+  setup) but younger — see "Sharp edges".
 
 ## Install
 
@@ -138,8 +139,10 @@ Personas are plain markdown — editing a teammate's soul.md IS how you tune the
 
 ## Sharp edges
 
-- **Windows-first.** Paths and process handling are tested on Windows 11. macOS/Linux
-  should mostly work (the code uses Node path APIs), but it is not battle-tested there.
+- **Windows-first, Mac-second.** Daily-driven on Windows 11. The macOS path is
+  supported (everything is Node; setup normalizes paths for your OS) but has had
+  far fewer hours on it — if something misbehaves on a Mac, suspect a path or
+  process quirk first and report it.
 - **Single-user by design.** One human, one machine, one team. No auth on the
   dashboard — do not expose it to the open internet (Tailscale keeps it private).
 - **Prototype-grade codebase.** No tests. Expect to read code when something breaks.
