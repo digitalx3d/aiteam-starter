@@ -19,7 +19,7 @@ function safeScope(scope: string): string {
   return scope.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
-function rollingSummaryPath(scope: string): string {
+export function rollingSummaryPath(scope: string): string {
   return path.join(
     getConfig().vaultDir,
     "agents",

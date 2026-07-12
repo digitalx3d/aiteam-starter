@@ -22,6 +22,11 @@ interface EndSessionResponse {
   sessionId?: string;
   reason?: string;
   error?: string;
+  /** The archived transcript's own markdown, so the dashboard can show it
+   *  immediately without a round-trip back through the vault. */
+  markdown?: string;
+  /** epoch ms — when the archive was written. */
+  endedAt?: number;
 }
 
 export async function POST(request: Request) {
@@ -161,6 +166,8 @@ export async function POST(request: Request) {
     vaultPath: archived.vaultPath,
     messageCount: archived.messageCount,
     sessionId,
+    markdown: archived.markdown,
+    endedAt: endedAt.getTime(),
   };
   return new Response(JSON.stringify(payload), {
     headers: { "Content-Type": "application/json" },

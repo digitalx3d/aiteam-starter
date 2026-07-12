@@ -16,9 +16,11 @@ const IMAGE_MIME: Record<string, string> = {
   ".avif": "image/avif",
 };
 
-// Files are served from <PROJECTS_ROOT>/<project>/chat-images/<...>. The catch-all
-// segment is the path relative to PROJECTS_ROOT. We require the path to include a
-// "chat-images" segment so a misconfigured URL can't read arbitrary repo content.
+// Files are served from <PROJECTS_ROOT>/<project>/chat-images/<...> or
+// <PROJECTS_ROOT>/<project>/note-images/<...>. The catch-all segment is the
+// path relative to PROJECTS_ROOT. We require the path to include one of the
+// allowed segment names so a misconfigured URL can't read arbitrary repo content.
+const ALLOWED_IMAGE_DIRS = new Set(["chat-images", "note-images"]);
 export async function GET(
   _request: Request,
   ctx: { params: Promise<{ path: string[] }> }
@@ -39,8 +41,8 @@ export async function GET(
   if (decoded.some((s) => s.includes("..") || s.includes("\0"))) {
     return new Response("Bad path", { status: 400 });
   }
-  if (!decoded.includes("chat-images")) {
-    return new Response("Only chat-images paths are served", { status: 403 });
+  if (!decoded.some((s) => ALLOWED_IMAGE_DIRS.has(s))) {
+    return new Response("Only chat-images/note-images paths are served", { status: 403 });
   }
 
   const ext = path.extname(decoded[decoded.length - 1]).toLowerCase();

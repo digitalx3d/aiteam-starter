@@ -132,3 +132,59 @@ export async function archiveTranscript(opts: BuildOptions): Promise<ArchiveResu
     markdown: md,
   };
 }
+
+export interface LatestArchive {
+  markdown: string;
+  messageCount: number;
+  vaultPath: string;
+  /** File mtime, epoch ms — when this transcript was actually written. */
+  endedAt: number;
+}
+
+/**
+ * Find the most recently archived transcript for a scope, reading straight
+ * from the vault rather than any client-side cache. This is the ONLY
+ * authoritative source for "what did the last ended session in this scope
+ * actually contain" — the dashboard's archived-conversation banner is built
+ * from this, never from browser state, so it can't go stale or get silently
+ * dropped by an unrelated reconcile bug.
+ */
+export async function findLatestArchive(scope: string): Promise<LatestArchive | null> {
+  const safeScope = scope.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const transcriptsDir = path.join(getConfig().vaultDir, "transcripts");
+  let monthDirs: string[];
+  try {
+    monthDirs = await fsp.readdir(transcriptsDir);
+  } catch {
+    return null;
+  }
+  // Filenames start with YYYY-MM-DD so lexical sort is chronological. Only
+  // check the last few months — a lookup this old wouldn't be useful anyway.
+  monthDirs.sort().reverse();
+  for (const month of monthDirs.slice(0, 3)) {
+    const dir = path.join(transcriptsDir, month);
+    let files: string[];
+    try {
+      files = await fsp.readdir(dir);
+    } catch {
+      continue;
+    }
+    const matches = files.filter((f) => f.endsWith(`-${safeScope}.md`)).sort().reverse();
+    if (matches.length === 0) continue;
+    const file = matches[0];
+    const full = path.join(dir, file);
+    try {
+      const [raw, stat] = await Promise.all([fsp.readFile(full, "utf8"), fsp.stat(full)]);
+      const countMatch = raw.match(/^message_count:\s*(\d+)/m);
+      return {
+        markdown: raw,
+        messageCount: countMatch ? Number(countMatch[1]) : 0,
+        vaultPath: `transcripts/${month}/${file}`,
+        endedAt: stat.mtimeMs,
+      };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}

@@ -6,9 +6,19 @@ import {
   getOrCreateSessionId,
   healSessionStateForCwd,
   markSessionStarted,
+  markHeavyWarned,
+  readChatState,
 } from "@/lib/chat-state";
 import { resolveProjectCwd } from "@/lib/projects";
 import { getConfig } from "@/lib/config";
+import { sessionLogPath } from "@/lib/session-log";
+import {
+  countRealUserTurns,
+  getCurrentContextTokens,
+  HEAVY_TOKENS,
+  MIN_TURNS,
+  QUIET_MINUTES,
+} from "@/lib/session-heaviness";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -206,6 +216,38 @@ export async function POST(request: Request) {
           await markSessionStarted(sessionId, slug);
         } catch {
           /* best-effort */
+        }
+      }
+
+      // "Context is getting large" nudge — fires once per session, the turn it
+      // first crosses HEAVY_TOKENS, but only once there's enough real back-and-
+      // forth (MIN_TURNS) that the auto-archive sweep would actually apply to
+      // it. Never blocks or fails the turn.
+      if (code === 0) {
+        try {
+          const logPath = sessionLogPath(cwd, sessionId);
+          const tokens = await getCurrentContextTokens(logPath);
+          if (tokens >= HEAVY_TOKENS) {
+            const currentState = await readChatState(slug);
+            if (currentState && !currentState.heavyWarned) {
+              const turns = await countRealUserTurns(logPath);
+              if (turns >= MIN_TURNS) {
+                await markHeavyWarned(currentState, slug);
+                safeEnqueue(
+                  sseFrame(
+                    JSON.stringify({
+                      type: "heavy-warning",
+                      tokens,
+                      turns,
+                      quietMinutes: QUIET_MINUTES,
+                    })
+                  )
+                );
+              }
+            }
+          }
+        } catch {
+          /* best-effort — never block the turn on this */
         }
       }
 

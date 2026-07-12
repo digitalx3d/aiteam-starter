@@ -3,7 +3,7 @@
 import { memo, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronRight, ChevronDown, Circle, Check, X } from "lucide-react";
+import { ChevronRight, ChevronDown, Circle, Check, X, AlertTriangle } from "lucide-react";
 import { AgentAvatar } from "./agent-avatar";
 import { useOwner } from "./owner-context";
 import { ChatImage } from "./chat-image";
@@ -534,10 +534,15 @@ function MessageBubbleInner({
 
   if (isSystem) {
     return (
-      <div className="px-3 sm:px-6 py-2 text-xs text-muted font-mono">
-        {message.blocks.map((b, i) =>
-          b.kind === "text" ? <div key={i}>{b.text}</div> : null
-        )}
+      <div className="px-3 sm:px-6 py-2">
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px" />
+          <div>
+            {message.blocks.map((b, i) =>
+              b.kind === "text" ? <div key={i}>{b.text}</div> : null
+            )}
+          </div>
+        </div>
       </div>
     );
   }

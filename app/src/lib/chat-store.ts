@@ -425,6 +425,26 @@ async function consumeStream(
       finalizeAssistant();
       return;
     }
+    if (type === "heavy-warning") {
+      const tokens = Number(evt.tokens ?? 0);
+      const turns = Number(evt.turns ?? 0);
+      const quietMinutes = Number(evt.quietMinutes ?? 60);
+      const text =
+        `Our conversation is getting large — ${turns} messages, ` +
+        `${tokens.toLocaleString()} tokens. Consider ending this session soon ` +
+        `(the archive button above), or it'll be archived automatically after ` +
+        `${quietMinutes} minutes of no activity.`;
+      updateMessages(key, (prev) => [
+        ...prev,
+        {
+          id: `heavy-warning-${Date.now()}`,
+          role: "system",
+          blocks: [{ kind: "text", text }],
+          createdAt: Date.now(),
+        },
+      ]);
+      return;
+    }
 
     recordTrace(evt);
 

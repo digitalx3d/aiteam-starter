@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Send, Square, ChevronDown, Archive, Paperclip, X as XIcon } from "lucide-react";
 import { MessageBubble } from "./message-bubble";
+import { ArchivedBlock, type ArchivedTranscript } from "./archived-block";
 import { ActivityPanel } from "./activity-panel";
 import type { ChatMessage } from "@/lib/types";
 import {
@@ -26,6 +27,12 @@ import {
   markScopeSeen as storeMarkScopeSeen,
   type ScopeKey,
 } from "@/lib/chat-store";
+
+function archiveDismissedKey(projectSlug?: string | null): string {
+  return projectSlug
+    ? `aiteam.chat.archiveDismissed.project.${projectSlug}`
+    : "aiteam.chat.archiveDismissed";
+}
 
 type ModelChoice = "haiku" | "sonnet" | "opus";
 const MODEL_LABELS: Record<ModelChoice, string> = {
@@ -72,6 +79,13 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
   const transcriptUrl = slug
     ? `/api/chat/transcript?project=${encodeURIComponent(slug)}`
     : "/api/chat/transcript";
+  const primerUrl = slug
+    ? `/api/chat/primer?project=${encodeURIComponent(slug)}`
+    : "/api/chat/primer";
+  const lastArchiveUrl = slug
+    ? `/api/chat/last-archive?project=${encodeURIComponent(slug)}`
+    : "/api/chat/last-archive";
+  const dismissKey = archiveDismissedKey(slug);
 
   // Subscribe to the per-scope chat state from the module-level store.
   // The store keeps streaming through page navigation — this hook just renders whatever the store currently has.
@@ -89,6 +103,85 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
     getServerSnapshot
   );
   const { messages, busy, errorBanner, errorDetail } = scopeState;
+
+  // The archived-conversation banner is deliberately NOT part of the live
+  // `messages` array/store: it's fetched fresh from the vault (the actual
+  // authoritative record) on every mount, so it can never go stale from a
+  // browser cache and can never get silently overwritten by the live-session
+  // reconcile below — both of which were real bugs in the earlier version
+  // of this feature (confirmed 2026-07-12: content missing from the archived
+  // view and the recap was the local cache lagging, then getting wiped
+  // wholesale once the new session's message count passed it).
+  const [archivedTranscript, setArchivedTranscript] = useState<ArchivedTranscript | null>(null);
+  const [recapText, setRecapText] = useState<string | null>(null);
+
+  const dismissArchived = useCallback(() => {
+    if (archivedTranscript && typeof window !== "undefined") {
+      window.localStorage.setItem(dismissKey, archivedTranscript.vaultPath);
+    }
+    setArchivedTranscript(null);
+    setRecapText(null);
+  }, [archivedTranscript, dismissKey]);
+
+  // Fetch the vault's most recent archive for this scope on every mount —
+  // cheap (one small file read) and always accurate, whether the session
+  // ended via the button or the background sweep while this tab was closed.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(lastArchiveUrl);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { archive: ArchivedTranscript | null };
+        if (cancelled || !data.archive) return;
+        const dismissedFor =
+          typeof window !== "undefined" ? window.localStorage.getItem(dismissKey) : null;
+        if (dismissedFor === data.archive.vaultPath) return;
+        setArchivedTranscript(data.archive);
+      } catch {
+        /* no archive to show, not fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scopeKey, lastArchiveUrl, dismissKey]);
+
+  // Once there's an archive to show, poll for its distilled recap (a real
+  // Sonnet call — see claude-distill.ts — so it isn't instant). Gated on
+  // updatedAt so a recap from a PREVIOUS archive generation never gets shown
+  // against this one. Gives up silently after a handful of tries; the
+  // transcript itself is already safely in the vault regardless.
+  useEffect(() => {
+    if (!archivedTranscript) {
+      setRecapText(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const MAX_TRIES = 6;
+      const INTERVAL_MS = 8000;
+      for (let i = 0; i < MAX_TRIES; i++) {
+        if (cancelled) return;
+        try {
+          const res = await fetch(primerUrl);
+          if (res.ok) {
+            const data = (await res.json()) as { text: string | null; updatedAt: number | null };
+            if (data.text && data.updatedAt && data.updatedAt >= archivedTranscript.endedAt) {
+              if (!cancelled) setRecapText(data.text);
+              return;
+            }
+          }
+        } catch {
+          /* keep trying */
+        }
+        if (i < MAX_TRIES - 1) await new Promise((r) => setTimeout(r, INTERVAL_MS));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [archivedTranscript, primerUrl]);
 
   // Mark this scope as "seen" while mounted: on initial mount, on every messages
   // update (so live-streaming responses don't accumulate unread count), and on
@@ -203,17 +296,31 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
         archived: boolean;
         vaultPath?: string;
         messageCount?: number;
+        sessionId?: string;
         reason?: string;
         error?: string;
+        markdown?: string;
+        endedAt?: number;
       };
       if (!data.ok) {
         setArchiveNotice({ kind: "err", error: data.error ?? "unknown error" });
         return;
       }
-      // Clear the visible chat regardless of whether anything was archived.
+      // Clear the live conversation — the archive banner (set below when we
+      // actually archived something) is now separate state, sourced straight
+      // from what the server just wrote to the vault, not from this array.
       storeSetMessages(scopeKey, []);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(transcriptKey);
+      }
+      if (data.archived && data.vaultPath && data.markdown && data.endedAt) {
+        setArchivedTranscript({
+          markdown: data.markdown,
+          messageCount: data.messageCount ?? 0,
+          vaultPath: data.vaultPath,
+          endedAt: data.endedAt,
+        });
+        setRecapText(null);
       }
       if (data.archived && data.vaultPath) {
         setArchiveNotice({
@@ -267,6 +374,10 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
                 );
                 storeSetMessages(scopeKey, cleaned);
               } else if (!stored.sessionId || stored.sessionId !== serverSessionId) {
+                // The cached session isn't the live one anymore — it ended
+                // (button or auto-sweep). Nothing to preserve here: the
+                // archived-transcript fetch above (sourced from the vault,
+                // not this cache) is what shows the old conversation now.
                 window.localStorage.removeItem(transcriptKey);
               }
             }
@@ -292,7 +403,10 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
         const current = storeGetSnapshot(scopeKey);
         if (current.messages.some((m) => m.pending)) return;
 
-        // Session was reset on server → adopt empty + clear cache
+        // No live session yet for this scope — nothing to reconcile. The
+        // archived-transcript fetch (above, sourced from the vault) already
+        // covers "show the old conversation"; this array just stays empty
+        // until the user's next message starts a fresh session.
         if (!tData.hasSession) {
           if (current.messages.length > 0) {
             storeSetMessages(scopeKey, []);
@@ -567,6 +681,13 @@ export function ChatSurface({ projectSlug }: ChatSurfaceProps = {}) {
   return (
     <div className="flex flex-col h-full relative">
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+        {archivedTranscript && (
+          <ArchivedBlock
+            archive={archivedTranscript}
+            recapText={recapText}
+            onDismiss={dismissArchived}
+          />
+        )}
         {messages.length === 0 && (
           <div className="px-4 sm:px-6 py-12 text-sm text-muted">
             Empty conversation. Type a message below to start.

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, ListChecks, Users } from "lucide-react";
+import { MessageSquare, ListChecks, Users, StickyNote } from "lucide-react";
 
 interface Tab {
   href: string;
@@ -18,6 +18,7 @@ export function ProjectTabs({ slug }: { slug: string }) {
     { href: base, label: "Chat", icon: MessageSquare },
     { href: `${base}/tasks`, label: "Tasks", icon: ListChecks },
     { href: `${base}/agents`, label: "Agents", icon: Users },
+    { href: `${base}/notes`, label: "Notes", icon: StickyNote },
   ];
 
   // Live count of agents actively working in THIS project — drives the green dot

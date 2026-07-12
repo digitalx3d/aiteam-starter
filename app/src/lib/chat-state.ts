@@ -43,6 +43,9 @@ async function tryReadJson(file: string): Promise<ChatState | null> {
       return {
         sessionId: parsed.sessionId,
         started: parsed.started ?? false,
+        permissionMode: parsed.permissionMode,
+        heavyWarned: parsed.heavyWarned,
+        slug: parsed.slug,
       };
     }
     return null;
@@ -93,7 +96,7 @@ export async function getOrCreateSessionId(
 ): Promise<ChatState> {
   const existing = await readChatState(slug);
   if (existing) return existing;
-  const fresh: ChatState = { sessionId: randomUUID(), started: false };
+  const fresh: ChatState = { sessionId: randomUUID(), started: false, slug: slug ?? null };
   await writeChatState(fresh, slug);
   return fresh;
 }
@@ -102,7 +105,14 @@ export async function markSessionStarted(
   sessionId: string,
   slug?: string | null
 ): Promise<void> {
-  await writeChatState({ sessionId, started: true }, slug);
+  await writeChatState({ sessionId, started: true, slug: slug ?? null }, slug);
+}
+
+export async function markHeavyWarned(
+  state: ChatState,
+  slug?: string | null
+): Promise<void> {
+  await writeChatState({ ...state, heavyWarned: true }, slug);
 }
 
 /**
@@ -130,7 +140,7 @@ export async function healSessionStateForCwd(
   } catch {
     return state; // jsonl not present, state is accurate
   }
-  const healed: ChatState = { sessionId: state.sessionId, started: true };
+  const healed: ChatState = { ...state, started: true, slug: state.slug ?? slug ?? null };
   await writeChatState(healed, slug);
   return healed;
 }

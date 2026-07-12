@@ -41,16 +41,18 @@ function stamp(): string {
   );
 }
 
-function resolveProjectChatImagesDir(slugOrEmpty: string): string | null {
+const ALLOWED_KINDS = new Set(["chat-images", "note-images"]);
+
+function resolveProjectImagesDir(slugOrEmpty: string, kind: string): string | null {
   const slug = (slugOrEmpty || "").trim() || DEFAULT_PROJECT_SLUG;
   // Special-case aiTeam: not in HIDDEN_PROJECTS-aware resolveProjectCwd, but the
   // directory exists at PROJECTS_ROOT\aiTeam either way.
   if (slug === DEFAULT_PROJECT_SLUG) {
-    return path.join(getProjectsRoot(), DEFAULT_PROJECT_SLUG, "chat-images");
+    return path.join(getProjectsRoot(), DEFAULT_PROJECT_SLUG, kind);
   }
   const cwd = resolveProjectCwd(slug);
   if (!cwd) return null;
-  return path.join(cwd, "chat-images");
+  return path.join(cwd, kind);
 }
 
 export async function POST(request: Request) {
@@ -63,7 +65,12 @@ export async function POST(request: Request) {
 
   const slugField = form.get("project");
   const slug = typeof slugField === "string" ? slugField : "";
-  const dir = resolveProjectChatImagesDir(slug);
+  const kindField = form.get("kind");
+  const kind =
+    typeof kindField === "string" && ALLOWED_KINDS.has(kindField)
+      ? kindField
+      : "chat-images";
+  const dir = resolveProjectImagesDir(slug, kind);
   if (!dir) {
     return json({ error: `Unknown project: ${slug}` }, 400);
   }
@@ -99,7 +106,7 @@ export async function POST(request: Request) {
     const projectFolderName = slug || DEFAULT_PROJECT_SLUG;
     saved.push({
       // Browser-renderable URL via the file-serving route.
-      url: `/api/files/${encodeURIComponent(projectFolderName)}/chat-images/${encodeURIComponent(filename)}`,
+      url: `/api/files/${encodeURIComponent(projectFolderName)}/${kind}/${encodeURIComponent(filename)}`,
       // Absolute Windows path — what we include in the prompt so Claude's Read
       // tool can pick it up as multimodal input.
       path: absolute,
