@@ -14,6 +14,8 @@ This is the "starter" distribution of a personal system, shared privately with a
 circle. It is real, daily-driven software — and also one person's system with sharp
 edges. Read "Sharp edges" before you judge it.
 
+![The Bridge — dashboard chat with CVB, Big 5, spend, and the live feed](screenshots/The-Bridge.png)
+
 ## What you get
 
 - **The Bridge** — a dashboard chat with CVB, plus per-project chats that each run in
@@ -25,6 +27,9 @@ edges. Read "Sharp edges" before you judge it.
 - **Live Feed** — every working agent posts plain-English progress updates (20-60
   words, enforced by a hook) so you can watch the team work.
 - **Task boards** — per-project markdown task boards the dispatch engine keeps updated.
+- **Notes** — a stripped-down Google Keep, one board per project: quick cards for
+  ideas, screenshots, and links, with pasted spreadsheet selections rendering as
+  real tables.
 - **War Room** — a live multi-agent brainstorm: your whole team argues an idea in
   rounds, CVB facilitates and writes up exactly the deliverable you asked for.
   Optionally invite outside consultants (GPT, Gemini, Grok) via an OpenRouter key.
@@ -32,6 +37,72 @@ edges. Read "Sharp edges" before you judge it.
   primer the next session auto-loads, so the team remembers.
 - **Big 5** — your top-of-mind priorities, editable from the dashboard, visible to the
   team.
+- **Skills browser** — every capability your team has installed, in one searchable
+  card grid, tagged by where it came from, one click to read the full instructions.
+- **Shared inbox** — your team posts questions, blockers, and finished-work notes to
+  one running feed; filter by agent or priority and mark things read as you catch up.
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+<img src="screenshots/Team.png" alt="Team page">
+<br><sub><b>Team</b> — the starter ships with four (CVB, Maya, Devin, Casey); this is
+what it looks like after growing the team (see "Growing the team" below).</sub>
+</td>
+<td width="50%">
+<img src="screenshots/Projects-List.png" alt="Projects list">
+<br><sub><b>Projects</b> — every project on your machine, auto-detected.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="screenshots/Project-Page.png" alt="Per-project chat">
+<br><sub><b>Per-project chat</b> — CVB, scoped to that project's own folder, with its
+own Big 3 and spend.</sub>
+</td>
+<td width="50%">
+<img src="screenshots/Project-Tasks.png" alt="Task board">
+<br><sub><b>Task board</b> — the dispatch engine keeps it updated as work moves.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="screenshots/Project-Notes.png" alt="Notes">
+<br><sub><b>Notes</b> — quick cards per project; pasted spreadsheet selections render
+as real tables.</sub>
+</td>
+<td width="50%">
+<img src="screenshots/Agent-Details.png" alt="Agent detail page">
+<br><sub><b>Agent detail</b> — full profile for any teammate: voice, tools, inbox,
+completed work.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="screenshots/Skills-Library.png" alt="Skills browser">
+<br><sub><b>Skills</b> — searchable, tagged by source. The starter seeds one; it grows
+as you and your agents add more.</sub>
+</td>
+<td width="50%">
+<img src="screenshots/Shared-Inbox.png" alt="Shared inbox">
+<br><sub><b>Inbox</b> — the team's questions, blockers, and finished-work notes in one
+feed.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="screenshots/War-Room.png" alt="War Room">
+<br><sub><b>War Room</b> — drop an idea, the whole team argues it out live.</sub>
+</td>
+<td width="50%">
+<img src="screenshots/Settings.png" alt="Settings page">
+<br><sub><b>Settings</b> — every path the app uses, editable without touching a config
+file.</sub>
+</td>
+</tr>
+</table>
 
 ## Prerequisites
 
