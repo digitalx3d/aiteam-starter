@@ -71,6 +71,14 @@ Canonical source: `vault/team/roster.md`. Add new teammates there first.
   ```
   Keep it to a few plain lines. The dashboard shows this block; a wall of agent-speak does not serve {{OWNER_FIRST}}.
 - **CVB:** report to {{OWNER_FIRST}} in three lines — what shipped, what's blocked, what's next. Post durable status to `inbox-shared.md`. Keep it short; long status updates are how teams hide.
+- **`inbox-shared.md` is {{OWNER_FIRST}}'s inbox, not the team's notice board.** The dashboard's Inbox page shows only the posts meant for {{OWNER_FIRST}}. Workers (Maya, Devin, Casey) put task summaries, plans and notes in their `===REPORT===` block to CVB, not in `inbox-shared.md`; CVB decides what reaches {{OWNER_FIRST}}. Every post there starts with a heading and an id line, newest at the top, posts separated by `---`:
+  ```
+  ## 2026-01-15 -- CVB: Bakery site menu page is live
+  > **id:** 2026-01-15T1430-cvb-menu-live · **from:** cvb · **to:** owner · **project:** bakery-site · **priority:** medium
+
+  Body in plain English.
+  ```
+  `to:` names who it is for: `owner` (or {{OWNER_FIRST}}'s first name) for {{OWNER_FIRST}}, a teammate's name for them, `all` for everyone. `project:` is the project's folder name; leave it out only when the post is about no project. Use `priority: high` only when {{OWNER_FIRST}} must act soon. A post addressed only to teammates, or a worker's post with no `to:`, is kept in the file for the team and not shown to {{OWNER_FIRST}}, unless it is `high`.
 - **Everyone:** keep the Live Feed alive while you work; the full posting contract is the next section.
 
 ## Live Feed (every agent)

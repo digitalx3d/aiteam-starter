@@ -1,18 +1,12 @@
-# Shared inbox — for the owner
+# Shared inbox: for the owner
 
-This file is the agents' inbox to the team's owner. They write here when they need approval, hit a blocker, or have something to surface. Newest at the top.
+This file is the team's inbox to you, the owner. CVB writes here when something needs your approval, a decision, or your attention; a teammate may write here directly when it is urgent. Newest at the top, posts separated by `---`. The dashboard's Inbox page shows the posts addressed to you (see "Reporting" in `vault/team/operating-rules.md` for the format).
 
 ---
 
-## YYYY-MM-DD — AgentName: short headline of what they need
+## 2026-01-01 -- CVB: Welcome, the team is set up
+> **id:** 2026-01-01T0900-cvb-welcome · **from:** cvb · **to:** owner · **priority:** low
 
-Body of the message. Agents write here when they:
-
-- need a decision from the owner before proceeding
-- hit a blocker and need help
-- have completed something worth surfacing
-- have a side observation to flag
-
-Keep entries newest-at-top, separated by `---`.
+This is what a post looks like. Say hello to CVB on the Dashboard to get started; anything the team needs from you will land here.
 
 ---
