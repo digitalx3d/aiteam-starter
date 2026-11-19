@@ -109,7 +109,7 @@ export function ManageProjectsButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-muted-bg/50 hover:bg-muted-bg text-xs font-medium text-foreground/90 transition-colors"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 max-md:min-h-10 rounded-md border border-border bg-muted-bg/50 hover:bg-muted-bg text-xs font-medium text-foreground/90 transition-colors"
         title="Hide or unhide projects"
       >
         <EyeOff className="h-3.5 w-3.5" />

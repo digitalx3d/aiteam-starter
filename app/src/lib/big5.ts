@@ -89,7 +89,46 @@ export async function readBig5(): Promise<Big5Data> {
   return parseBig5(raw);
 }
 
-export async function writeBig5(data: Big5Data): Promise<void> {
+/**
+ * A stamp identifying the version of the file a client is looking at.
+ *
+ * The card edits by sending the WHOLE list back, so a tab that loaded an hour
+ * ago will happily overwrite anything written since with its stale copy. That
+ * is not hypothetical: on 2026-08-18 an open tab wiped a priority that had been
+ * added to the file minutes earlier, and the only symptom was the item quietly
+ * not being there. Callers pass this back on write; a mismatch is refused.
+ */
+export async function big5Revision(): Promise<string> {
+  try {
+    const stat = await fsp.stat(big5Path());
+    return String(stat.mtimeMs);
+  } catch {
+    return "0"; // no file yet — any write is the first
+  }
+}
+
+export class Big5ConflictError extends Error {
+  constructor(public current: Big5Data, public revision: string) {
+    super("big5.md changed since this copy was loaded");
+  }
+}
+
+/**
+ * Write the list, refusing if the file moved on since `expectedRevision`.
+ * Omitting the revision keeps the old last-write-wins behaviour, which is what
+ * a script editing the file directly wants.
+ */
+export async function writeBig5(
+  data: Big5Data,
+  expectedRevision?: string
+): Promise<string> {
+  if (expectedRevision !== undefined) {
+    const current = await big5Revision();
+    if (current !== expectedRevision) {
+      throw new Big5ConflictError(await readBig5(), current);
+    }
+  }
   const md = serializeBig5(data);
   await fsp.writeFile(big5Path(), md, "utf8");
+  return big5Revision();
 }

@@ -1,78 +1,23 @@
-import Link from "next/link";
-import { Folder, GitBranch, Package, Sparkles } from "lucide-react";
-import { discoverProjects, getProjectsRoot, type ProjectListing } from "@/lib/projects";
+import { discoverProjects, getProjectsRoot } from "@/lib/projects";
 import { readHiddenProjects } from "@/lib/hidden-projects";
-import { ProjectUnreadBadge } from "@/components/project-unread-badge";
+import { getProjectSignals } from "@/lib/project-signals";
 import { NewProjectButton } from "@/components/new-project-button";
 import { ManageProjectsButton } from "@/components/manage-projects-button";
-import { HideProjectButton } from "@/components/hide-project-button";
+import { ProjectRows } from "@/components/project-rows";
 
 export const dynamic = "force-dynamic";
-
-function timeAgo(ms: number): string {
-  const diff = Math.max(0, Date.now() - ms);
-  const m = Math.floor(diff / 60000);
-  if (m < 60) return m <= 1 ? "just now" : `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  const mo = Math.floor(d / 30);
-  return `${mo}mo ago`;
-}
-
-function ProjectRow({ project }: { project: ProjectListing }) {
-  return (
-    // The hide button is a sibling of the Link (not nested inside it) so we
-    // never put a <button> inside an <a>. The shared `group` drives its hover.
-    <div className="flex items-stretch border-b border-border/50 hover:bg-muted-bg/40 transition-colors group">
-      <Link
-        href={`/projects/${encodeURIComponent(project.slug)}`}
-        className="flex items-center gap-3 px-4 sm:px-5 py-3 min-w-0 flex-1"
-      >
-        <Folder className="h-4 w-4 text-muted shrink-0" />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-foreground/90 truncate">
-            {project.name}
-          </div>
-          {/* Path hidden on small screens — too long to be useful at 375px */}
-          <div className="hidden sm:block text-xs text-muted truncate font-mono">
-            {project.path}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 text-muted">
-          <ProjectUnreadBadge slug={project.slug} />
-          {project.hasGit && (
-            <span title="git repo">
-              <GitBranch className="h-3.5 w-3.5" />
-            </span>
-          )}
-          {project.hasPackageJson && (
-            <span title="npm package" className="hidden sm:inline">
-              <Package className="h-3.5 w-3.5" />
-            </span>
-          )}
-          {project.hasClaude && (
-            <span title=".claude config" className="text-emerald-600 dark:text-emerald-400">
-              <Sparkles className="h-3.5 w-3.5" />
-            </span>
-          )}
-        </div>
-        {/* Time stamp hidden on smallest screens */}
-        <div className="hidden sm:block text-[11px] text-muted shrink-0 w-20 text-right font-mono">
-          {timeAgo(project.modifiedMs)}
-        </div>
-      </Link>
-      <HideProjectButton name={project.name} />
-    </div>
-  );
-}
 
 export default async function ProjectsPage() {
   const [projects, hiddenList] = await Promise.all([
     discoverProjects(),
     readHiddenProjects(),
   ]);
+  // Signals are cheap (dispatch tickets, task frontmatter, git) so they render
+  // with the page. Spend and time come from the store via a client fetch —
+  // see ProjectRows.
+  const signals = await getProjectSignals(
+    projects.map((p) => ({ slug: p.slug, cwd: p.path, hasGit: p.hasGit }))
+  );
   const projectsRoot = getProjectsRoot();
 
   return (
@@ -100,11 +45,18 @@ export default async function ProjectsPage() {
             </div>
           </div>
         ) : (
-          <div>
-            {projects.map((p) => (
-              <ProjectRow key={p.slug} project={p} />
-            ))}
-          </div>
+          <ProjectRows
+            projects={projects.map((p) => ({
+              slug: p.slug,
+              name: p.name,
+              path: p.path,
+              modifiedMs: p.modifiedMs,
+              hasGit: p.hasGit,
+              hasPackageJson: p.hasPackageJson,
+              hasClaude: p.hasClaude,
+            }))}
+            signals={signals}
+          />
         )}
       </div>
     </div>

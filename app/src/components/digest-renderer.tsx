@@ -66,7 +66,7 @@ const TEAMMATE_COLORS: Record<string, string> = {
   Ethan: "bg-red-900/50 text-red-300 border border-red-700/50",
   Casey: "bg-teal-900/50 text-teal-300 border border-teal-700/50",
   Indy: "bg-orange-900/50 text-orange-300 border border-orange-700/50",
-  John: "bg-amber-900/50 text-amber-300 border border-amber-700/50",
+  Owner: "bg-amber-900/50 text-amber-300 border border-amber-700/50",
 };
 
 function TeammateChip({ name }: { name: string }) {

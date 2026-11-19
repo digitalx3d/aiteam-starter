@@ -33,6 +33,13 @@ const PRICING: Record<string, ModelPricing> = {
     cacheWrite1h: 20,
     cacheRead: 1,
   },
+  "claude-opus-5": {
+    input: 5,
+    output: 25,
+    cacheWrite5m: 6.25,
+    cacheWrite1h: 10,
+    cacheRead: 0.5,
+  },
   "claude-opus-4-8": {
     input: 5,
     output: 25,
@@ -129,17 +136,59 @@ export function costForUsage(usage: UsageBlock, model: string): number {
   return (inCost + outCost + cwCost + crCost) / 1_000_000;
 }
 
-function encodeCwdForClaude(absCwd: string): string {
+export function encodeCwdForClaude(absCwd: string): string {
   // Claude Code names project dirs by replacing `\`, `/`, `:` with `-`.
   return absCwd.replace(/[\\/:]/g, "-");
 }
 
 
 /**
+ * Session IDs of every dispatched worker run, read from the dispatch tickets in
+ * app/.dispatches/*.json (same directory the dispatch route writes to).
+ *
+ * dispatch.mjs hands work to a teammate as a TOP-LEVEL claude.exe process with
+ * cwd = the project dir, so a worker's transcript lands as a top-level .jsonl in
+ * the same encoded folder as the owner's own sessions — indistinguishable by path.
+ * The ticket's `sessionId` is the only thing that tells them apart, which is why
+ * the agents bucket has to be driven off these files rather than the directory
+ * layout. (Before this existed, `agents` only ever counted Task-tool subagents
+ * under <parentSessionId>/subagents/, which the courier path never creates — so
+ * it read $0.00 on nearly every project.)
+ */
+async function dispatchedSessionIds(): Promise<Set<string>> {
+  const dir = path.join(process.cwd(), ".dispatches");
+  const ids = new Set<string>();
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(dir);
+  } catch {
+    return ids;
+  }
+  await Promise.all(
+    entries
+      .filter((name) => name.endsWith(".json"))
+      .map(async (name) => {
+        try {
+          const raw = await fsp.readFile(path.join(dir, name), "utf8");
+          const ticket = JSON.parse(raw) as { sessionId?: unknown };
+          if (typeof ticket.sessionId === "string" && ticket.sessionId) {
+            ids.add(ticket.sessionId);
+          }
+        } catch {
+          /* skip unreadable / malformed ticket */
+        }
+      })
+  );
+  return ids;
+}
+
+/**
  * Walk ~/.claude/projects/<encoded-project-cwd>/ and split cost into two buckets:
- *   - chat: top-level .jsonl files (primary CVB chat sessions with you)
- *   - agents: .jsonl files in any subdirectory (subagents spawned via the Task
- *     tool, stored at <parentSessionId>/subagents/agent-*.jsonl)
+ *   - agents: dispatched worker runs (top-level .jsonl whose name matches a
+ *     dispatch ticket's sessionId) plus Task-tool subagents (.jsonl in any
+ *     subdirectory, at <parentSessionId>/subagents/agent-*.jsonl)
+ *   - chat: everything else at the top level — the owner's own terminal and dashboard
+ *     sessions for this project
  *
  * Anything that ran with cwd != the project dir lands in a different encoded
  * folder and is excluded automatically. CVB Dashboard default chat runs from
@@ -151,12 +200,14 @@ async function chatAndAgentsCost(
 ): Promise<{ chat: number; agents: number }> {
   const encoded = encodeCwdForClaude(projectCwd);
   const projectDir = path.join(getConfig().claudeProjectsDir, encoded);
-  return splitWalk(projectDir, 0);
+  const dispatched = await dispatchedSessionIds();
+  return splitWalk(projectDir, 0, dispatched);
 }
 
 async function splitWalk(
   dir: string,
-  depth: number
+  depth: number,
+  dispatched: Set<string>
 ): Promise<{ chat: number; agents: number }> {
   let entries;
   try {
@@ -169,7 +220,7 @@ async function splitWalk(
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const sub = await splitWalk(full, depth + 1);
+      const sub = await splitWalk(full, depth + 1, dispatched);
       chat += sub.chat;
       agents += sub.agents;
     } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
@@ -179,8 +230,10 @@ async function splitWalk(
       } catch {
         /* skip unreadable file */
       }
-      if (depth === 0) chat += cost;
-      else agents += cost;
+      const isWorker =
+        depth > 0 || dispatched.has(entry.name.slice(0, -".jsonl".length));
+      if (isWorker) agents += cost;
+      else chat += cost;
     }
   }
   return { chat, agents };

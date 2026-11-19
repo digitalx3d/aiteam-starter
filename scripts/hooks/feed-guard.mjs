@@ -21,6 +21,13 @@
  *       - no bare acronyms or ALL-CAPS shorthand; teach shorthand as
  *         "full name (ACRONYM)" — in parentheses it is allowed
  *   - An agent may only post to its OWN now.md.
+ *   - posts/<ticket>.md under an agent's folder is the per-dispatch copy of its
+ *     posts (written by feed-post.mjs and the dispatch engine, read by the Live
+ *     Feed). Nobody hand-writes those; post to your now.md and it is copied.
+ *   - An agent's home folder is <agents-dir>/<agent>/. Writes to look-alike
+ *     homes (<aiTeam>/casey/, <aiTeam>/agents/casey/, a now.md in
+ *     any folder named after the agent) are redirected there. A post written to
+ *     a look-alike sits where the feed never looks, and nobody notices for days.
  *
  * Invocation: node feed-guard.mjs --agent <name> --project <label|any> --agents-dir <path>
  *
@@ -130,6 +137,44 @@ function nowMdOwner(fp) {
   return parts.length === 2 ? parts[0] : null;
 }
 
+/** Resolve a tool path against the session cwd and normalize it. */
+function resolved(fp) {
+  let p = String(fp || "");
+  if (!p) return "";
+  if (!path.isAbsolute(p) && input.cwd) p = path.join(input.cwd, p);
+  return norm(p);
+}
+
+/** True if fp is any agent's engine-managed post file (<agents-dir>/<x>/posts/...). */
+function isPostsFile(fp) {
+  const n = resolved(fp);
+  if (!n || !n.startsWith(AGENTS_DIR + "/")) return false;
+  return n.slice(AGENTS_DIR.length + 1).split("/")[1] === "posts";
+}
+
+/**
+ * True if fp sits in a look-alike of THIS agent's home folder rather than the
+ * real one: <...>/aiteam/<agent>/..., <...>/aiteam/agents/<agent>/..., or a
+ * now.md / completed.md / plan-current.md in any folder named after the agent.
+ */
+function isStrayHome(fp) {
+  const n = resolved(fp);
+  if (!n || n.startsWith(AGENTS_DIR + "/")) return false;
+  const a = AGENT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(^|/)aiteam/(agents/)?${a}/`).test(n)) return true;
+  return new RegExp(`/${a}/(now|completed|plan-current)\\.md$`).test(n);
+}
+
+function denyStrayHome(fp) {
+  const home = `${AGENTS_DIR}/${AGENT}/`;
+  deny(
+    `${fp} is not your folder. Your home folder is ${home} (now.md, completed.md, ` +
+      `plan-current.md and any working scripts go there). Files written anywhere else ` +
+      `never reach the Live Feed or your own logs. Write it under ${home} instead; ` +
+      `project output still goes in the project.`
+  );
+}
+
 function exampleFor(kind) {
   const proj = PROJECT === "any" ? "my-app" : PROJECT;
   return (
@@ -229,8 +274,14 @@ function validatePost(content) {
 }
 
 // ==== Edit family: now.md must be replaced wholesale via Write ====
+const POSTS_DENY =
+  `posts/ holds the Live Feed's per-dispatch copies of your posts; they are written for you. ` +
+  `Post by writing your own now.md with the Write tool and it is copied there automatically.`;
+
 if (["Edit", "MultiEdit", "NotebookEdit"].includes(tool)) {
   const fp = ti.file_path || ti.notebook_path || ti.path || "";
+  if (isPostsFile(fp)) deny(POSTS_DENY);
+  if (isStrayHome(fp)) denyStrayHome(fp);
   if (nowMdOwner(fp)) {
     deny(
       `now.md is your live status post, not a document to patch — replace it wholesale with the Write tool ` +
@@ -242,6 +293,8 @@ if (["Edit", "MultiEdit", "NotebookEdit"].includes(tool)) {
 
 // ==== Write: validate own posts; block posting as someone else ====
 if (tool === "Write") {
+  if (isPostsFile(ti.file_path)) deny(POSTS_DENY);
+  if (isStrayHome(ti.file_path)) denyStrayHome(ti.file_path);
   const owner = nowMdOwner(ti.file_path || "");
   if (!owner) allow();
   if (owner !== AGENT) {
@@ -256,6 +309,19 @@ if (tool === "Write") {
 // ==== Bash: writes that target now.md dodge the format check — redirect to Write ====
 if (tool === "Bash") {
   const raw = String(ti.command || "");
+  const rawN = norm(raw);
+  // Shell writes into an agent's posts/ folder skip the format check the same way.
+  // Matched on the agents-folder shape, not AGENTS_DIR itself, so git-bash
+  // (/c/users/...) and ~ spellings are caught too.
+  if (/\.claude\/agents\/[^/\s"']+\/posts\//.test(rawN)) {
+    const writeShaped =
+      // A redirect ">" follows a space, a digit (2>) or "&"; one glued to a word is
+      // the end of a placeholder like "<name>" in prose, not a write.
+      /(?:^|[\s\d&])>>?\s*[^\s&|;<>]*\/posts\/|\b(tee|mv|cp|rm|sed|touch|set-content|add-content|out-file)\b[^\n]*\/posts\//i.test(
+        rawN
+      );
+    if (writeShaped) deny(POSTS_DENY);
+  }
   if (/now\.md/i.test(raw)) {
     // Reads (cat/grep/stat) are fine; anything write-shaped gets redirected to Write.
     const writeShaped =

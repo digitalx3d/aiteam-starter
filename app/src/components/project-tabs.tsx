@@ -79,7 +79,8 @@ export function ProjectTabs({ slug }: { slug: string }) {
           <Link
             key={t.href}
             href={t.href}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+            // Phones: the four tabs share the width evenly and stand 44px tall.
+            className={`flex-1 sm:flex-none justify-center sm:justify-start min-h-11 sm:min-h-0 inline-flex items-center gap-1.5 px-2 sm:px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
               isActive
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted hover:text-foreground/80 hover:border-border"

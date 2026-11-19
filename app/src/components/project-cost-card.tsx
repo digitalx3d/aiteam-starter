@@ -18,10 +18,17 @@ function fmtUsd(n: number): string {
 
 interface ProjectCostCardProps {
   slug: string;
+  /** Reports the formatted total (null until loaded) for the collapsed Spend
+   *  chip in the phone header. */
+  onSummary?: (total: string | null) => void;
 }
 
-export function ProjectCostCard({ slug }: ProjectCostCardProps) {
+export function ProjectCostCard({ slug, onSummary }: ProjectCostCardProps) {
   const [cost, setCost] = useState<ProjectCost | null>(null);
+
+  useEffect(() => {
+    onSummary?.(cost ? fmtUsd(cost.total) : null);
+  }, [cost, onSummary]);
 
   const fetchCost = useCallback(async () => {
     try {
@@ -66,7 +73,7 @@ export function ProjectCostCard({ slug }: ProjectCostCardProps) {
       className="rounded-lg border border-border bg-card-bg px-3 py-2 shadow-md shadow-black/20 shrink-0 w-full"
       title={
         cost
-          ? `CVB chat sessions: ${fmtUsd(cost.chat)} (Opus)\nDispatched agents: ${fmtUsd(cost.agents)} (Sonnet)\n\nIncludes everything in ~/.claude/projects/Z--GitHub-${slug}/ — both top-level chat sessions and subagent runs spawned via the Task tool. Computed from per-message token usage at official rates.`
+          ? `Your own sessions: ${fmtUsd(cost.chat)}\nDispatched agents: ${fmtUsd(cost.agents)}\n\nIncludes everything in ~/.claude/projects/Z--GitHub-${slug}/. Agent runs are matched by session ID against the dispatch tickets in app/.dispatches/. Computed fresh on every load from per-message token usage at each model's official rates.`
           : "loading..."
       }
     >

@@ -89,7 +89,7 @@ function buildTranscriptMarkdown(opts: BuildOptions): string {
     `created: ${created}`,
     `updated: ${updated}`,
     `scope: ${scope}`,
-    "participants: [john, claude]",
+    "participants: [owner, claude]",
     `session_id: ${sessionId}`,
     `message_count: ${messages.length}`,
     "filed: false",

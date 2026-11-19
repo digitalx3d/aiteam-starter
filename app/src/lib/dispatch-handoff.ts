@@ -7,6 +7,12 @@ import { getConfig } from "./config";
  *
  * When a dispatched worker ends its report with a ===HANDOFF=== directive, the
  * dispatch engine can auto-dispatch the named teammate to act on it — bounded by:
+ *   - a REVIEW REQUEST on the originating dispatch (2026-08-20): a
+ *     handoff fires ONLY inside a line of work CVB explicitly marked. Devin no
+ *     longer sends himself to Ethan for every non-trivial diff; CVB decides when
+ *     security matters and says so when he dispatches. A worker cannot authorize
+ *     its own review, because the flag is set by the dispatcher, not by anything
+ *     the worker writes in its report.
  *   - a KILL SWITCH (off by default; opt-in via a flag file),
  *   - a WHITELIST of allowed (from -> to) pairs (hardcoded here, so an agent can't
  *     widen its own auto-dispatch policy by editing a data file),

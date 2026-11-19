@@ -143,7 +143,20 @@ function makeTokens(a) {
     "{{AGENTS_DIR}}": fwd(a.agentsDir),
     "{{PROJECTS_ROOT}}": fwd(a.projectsRoot),
     "{{MEMORY_DIR}}": fwd(path.join(os.homedir(), ".claude", "projects", projectSlug, "memory")),
+    "{{CLAUDE_DIR}}": fwd(path.join(os.homedir(), ".claude")),
+    // The same paths as git-bash spells them (C:/x becomes /c/x). The CVB guard
+    // sees whichever spelling the shell used, so its config lists both. On Mac
+    // and Linux these equal the plain versions.
+    "{{AITEAM_DIR_GITBASH}}": gitbash(REPO),
+    "{{VAULT_DIR_GITBASH}}": gitbash(a.vaultDir),
+    "{{AGENTS_DIR_GITBASH}}": gitbash(a.agentsDir),
+    "{{PROJECTS_ROOT_GITBASH}}": gitbash(a.projectsRoot),
+    "{{CLAUDE_DIR_GITBASH}}": gitbash(path.join(os.homedir(), ".claude")),
   };
+}
+
+function gitbash(p) {
+  return fwd(p).replace(/^([A-Za-z]):\//, (_, d) => `/${d.toLowerCase()}/`);
 }
 
 function render(text, tokens) {

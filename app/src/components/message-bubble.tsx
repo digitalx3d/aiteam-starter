@@ -340,7 +340,7 @@ function MarkdownText({ text, projectSlug }: { text: string; projectSlug?: strin
 }
 
 // Full team-member names. Mirrors the static / registered persona last names from agents.ts.
-// The human ("john" slug) comes from the owner-name config via OwnerProvider.
+// The human ("owner" slug) comes from the owner-name config via OwnerProvider.
 // Phase 2: when this list grows, refactor to a shared registry instead of duplicating.
 const FULL_NAMES: Record<string, string> = {
   claude: "Claude Von Braun",
@@ -354,7 +354,7 @@ const FULL_NAMES: Record<string, string> = {
 function displayName(message: ChatMessage, ownerFull: string): string {
   if (message.personaName) {
     const key = message.personaName.toLowerCase();
-    if (key === "john") return ownerFull;
+    if (key === "owner") return ownerFull;
     return FULL_NAMES[key] ?? message.personaName;
   }
   if (message.role === "user") return ownerFull;
@@ -376,7 +376,7 @@ function avatarConfig(
     return {
       name: ownerFirst,
       color: "purple",
-      imageUrl: "/avatars/john.webp",
+      imageUrl: "/avatars/owner.webp",
     };
   }
   // assistant — defaults to Claude (the orchestrator). When Maya/Devin/Casey post in chat, set personaName + we'll map here.
@@ -523,11 +523,18 @@ function MessageBubbleInner({
   onApprove,
   onDeny,
   projectSlug,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   message: ChatMessage;
   onApprove?: (toolUseId: string) => void;
   onDeny?: (toolUseId: string) => void;
   projectSlug?: string | null;
+  /** Selection mode for moving messages to another project chat. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
@@ -577,15 +584,44 @@ function MessageBubbleInner({
   // Claude's posts sit on the base. The two-level shift makes whose-post-is-whose obvious without bubbles.
   const rowBg = isUser ? "bg-user-bg" : "bg-background";
 
+  // In selection mode the whole row is a target: clicking anywhere on it toggles
+  // the message, and the avatar column doubles as the checkbox.
+  const selectionCls = selectable
+    ? " cursor-pointer " + (selected ? "ring-1 ring-inset ring-accent bg-accent/5" : "hover:bg-accent/5")
+    : "";
+
   return (
     <div
+      onClick={selectable ? () => onToggleSelect?.(message.id) : undefined}
       className={
-        "px-3 sm:px-6 py-3 sm:py-4 grid grid-cols-[44px_1fr] gap-2 sm:gap-3 border-b border-border/50 " +
-        rowBg
+        // Phones: a 32px avatar column hands the text another 12px of width.
+        "px-3 sm:px-6 py-3 sm:py-4 grid grid-cols-[32px_1fr] sm:grid-cols-[44px_1fr] gap-2 sm:gap-3 border-b border-border/50 " +
+        rowBg +
+        selectionCls
       }
     >
-      <Avatar message={message} />
-      <div className="text-sm min-w-0">
+      {selectable ? (
+        <div className="flex items-start justify-center pt-1">
+          <span
+            aria-hidden
+            className={`h-4 w-4 rounded border flex items-center justify-center text-[10px] ${
+              selected
+                ? "bg-accent border-accent text-accent-fg"
+                : "border-border bg-background"
+            }`}
+          >
+            {selected ? "\u2713" : ""}
+          </span>
+        </div>
+      ) : (
+        // The avatar sizes itself with an inline style, so the phone size has
+        // to override it from the wrapper.
+        <div className="max-sm:*:!size-8 max-sm:*:!text-sm">
+          <Avatar message={message} />
+        </div>
+      )}
+      {/* chat-prose: phone-only wrapping of long paths and commands (globals.css). */}
+      <div className="chat-prose text-sm min-w-0">
         <MessageHeader message={message} />
         {hasContent && (
           // Both user and assistant now render through markdown so that pasted

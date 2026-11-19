@@ -2,6 +2,7 @@ import path from "node:path";
 import { spawnClaude } from "@/lib/claude-spawn";
 import { buildVonBraunSystemPrompt } from "@/lib/claude-persona";
 import { buildCvbHookSettings } from "@/lib/cvb-hooks";
+import { readParkedMove, clearParkedMove } from "@/lib/chat-move";
 import {
   getOrCreateSessionId,
   healSessionStateForCwd,
@@ -12,6 +13,7 @@ import {
 import { resolveProjectCwd } from "@/lib/projects";
 import { getConfig } from "@/lib/config";
 import { sessionLogPath } from "@/lib/session-log";
+import { markLogLive } from "@/lib/session-log-lock";
 import {
   countRealUserTurns,
   getCurrentContextTokens,
@@ -23,9 +25,23 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/** Normalize a client-supplied effort value. Returns undefined for anything
+ *  unrecognized so a bad value falls back to the CLI default instead of being
+ *  passed through and erroring the spawn. */
+function normalizeEffort(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const v = value.trim().toLowerCase();
+  return (EFFORT_LEVELS as readonly string[]).includes(v) ? v : undefined;
+}
+
 interface ChatRequest {
   message: string;
   model?: string;
+  /** Reasoning effort (low|medium|high|xhigh|max). Silently ignored on haiku,
+   *  which has no --effort support (guarded in claude-spawn.ts). */
+  effort?: string;
   /** Optional project slug. When set, the chat is scoped to that project (its own session, its own cwd). */
   project?: string;
   /** Permission mode for Claude CLI. Default: acceptEdits. */
@@ -121,14 +137,30 @@ export async function POST(request: Request) {
         new Set([...(body.allowedTools ?? []), "Bash"])
       );
 
+      // Text moved here from another project chat while this one had no session
+      // to append to. It rides along with the next real message so the context
+      // arrives without the agent being prompted to act on it on its own.
+      let outgoingMessage = body.message;
+      const parked = await readParkedMove(slug);
+      if (parked) {
+        outgoingMessage = `${parked}\n\n---\n\n${body.message}`;
+        await clearParkedMove(slug);
+      }
+
+      // Tell the log editors (move, delete, worker-report posts) a turn is
+      // running against this session, for as long as it runs. They refuse to
+      // rewrite the log meanwhile; see lib/session-log-lock.ts.
+      const releaseLive = await markLogLive(sessionLogPath(cwd, sessionId));
+
       let result;
       try {
         result = spawnClaude({
           cwd,
           sessionId,
           resume,
-          message: body.message,
+          message: outgoingMessage,
           model: body.model,
+          effort: normalizeEffort(body.effort),
           permissionMode: body.permissionMode,
           allowedTools: mergedAllowedTools,
           // Block built-in tools that don't fit the dashboard's non-interactive
@@ -146,6 +178,7 @@ export async function POST(request: Request) {
           settings: buildCvbHookSettings(),
         });
       } catch (err) {
+        releaseLive();
         safeEnqueue(
           sseFrame(
             JSON.stringify({
@@ -193,7 +226,7 @@ export async function POST(request: Request) {
       };
       request.signal.addEventListener("abort", abort);
 
-      const { code, stderr } = await exitPromise;
+      const { code, stderr } = await exitPromise.finally(releaseLive);
       request.signal.removeEventListener("abort", abort);
 
       if (buffer.trim()) {

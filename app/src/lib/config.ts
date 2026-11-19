@@ -181,6 +181,26 @@ export function getConfig(): AiTeamConfig {
   return cfg;
 }
 
+/**
+ * The dispatch queue's off switch: `"dispatchQueue": false` in settings.json.
+ * On by default. When off, `dispatch.mjs --after` is refused and nothing already
+ * waiting is started (it stays listed and cancellable). See
+ * docs/dispatch-queue.md, "How to undo".
+ */
+export function isDispatchQueueEnabled(): boolean {
+  const v = readRawSettings().dispatchQueue;
+  if (v === false) return false;
+  if (typeof v === "string" && /^(false|off|no|0)$/i.test(v.trim())) return false;
+  return true;
+}
+
+/** The main dashboard's port: settings.json appPort, else the reserved 3900.
+ *  Same rule as scripts/dispatch.mjs; never the ambient PORT variable. */
+export function getAppPort(): string {
+  const v = readRawSettings().appPort;
+  return v !== undefined && v !== null && String(v).trim() ? String(v).trim() : "3900";
+}
+
 export interface OwnerName {
   /** Full display name, e.g. "Jane Smith". */
   full: string;

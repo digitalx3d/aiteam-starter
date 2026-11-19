@@ -138,6 +138,15 @@ export async function parseSessionLog(filePath: string): Promise<ChatMessage[]> 
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw err;
   }
+  return parseSessionLogText(raw);
+}
+
+/**
+ * The same, from text already in hand. Callers that edit a log use this so the
+ * messages they check a selection against come from the exact bytes they are
+ * about to rewrite, not from a second read that may have seen a newer file.
+ */
+export function parseSessionLogText(raw: string): ChatMessage[] {
   const lines = raw.split("\n");
   const entries: JsonlEntry[] = [];
   for (const line of lines) {
@@ -186,6 +195,28 @@ export async function parseSessionLog(filePath: string): Promise<ChatMessage[]> 
       continue;
     }
     const createdAt = e.timestamp ? new Date(e.timestamp).getTime() : Date.now();
+
+    // A worker report written straight into the log by dispatch-chat-post.ts so
+    // it survives with no browser open. It is stored as a USER entry (that is
+    // the shape the conversation needs, and it puts the report in CVB's context
+    // for the next turn), but it is the AGENT talking, so it renders on the
+    // agent's side with the agent's name and avatar.
+    const workerReport =
+      role === "user" && first?.kind === "text"
+        ? first.text.match(/^\[Worker report\]\s+([a-z0-9_-]+)/i)
+        : null;
+    if (workerReport) {
+      messages.push({
+        id: e.uuid ?? `${createdAt}-${messages.length}`,
+        role: "assistant",
+        personaName: workerReport[1].toLowerCase(),
+        blocks,
+        createdAt,
+        pending: false,
+      });
+      continue;
+    }
+
     messages.push({
       id: e.uuid ?? `${createdAt}-${messages.length}`,
       role,

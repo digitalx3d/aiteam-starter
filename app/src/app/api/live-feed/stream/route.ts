@@ -2,6 +2,7 @@ import path from "node:path";
 import { promises as fsp } from "node:fs";
 import { watch, type FSWatcher } from "node:fs";
 import { getConfig } from "@/lib/config";
+import { POSTS_DIRNAME, listLivePostIds, postPath, readPostMeta } from "@/lib/feed-posts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,11 @@ interface NarrationEvent {
   kind: Kind;
   text: string;
   project?: string;
+  /** Dispatch ticket id, when the post came from a dispatched worker's own post
+   *  file. Two parallel workers of the same agent have different slots. */
+  slot?: string;
+  /** Human label for the slot (the brief's title line). */
+  label?: string;
 }
 
 const KNOWN_KINDS: ReadonlySet<Kind> = new Set([
@@ -91,16 +97,82 @@ async function readNow(agent: string): Promise<NarrationEvent | null> {
   }
 }
 
-// Module-level dedupe: shared across SSE connections in the same Node process.
-// Prevents leaked filesystem watchers from logging the same now.md write multiple times.
-const lastLoggedTs = new Map<string, number>();
+/** One dispatch's own post (posts/<ticket>.md), labelled from its meta file. */
+async function readPost(agent: string, ticketId: string): Promise<NarrationEvent | null> {
+  try {
+    const filePath = postPath(agent, ticketId);
+    const stat = await fsp.stat(filePath);
+    const parsed = parseNow(await fsp.readFile(filePath, "utf8"));
+    if (!parsed) return null;
+    const meta = await readPostMeta(agent, ticketId);
+    return {
+      type: "narration",
+      ts: stat.mtimeMs,
+      agent,
+      kind: parsed.kind,
+      text: parsed.text,
+      project: parsed.project,
+      slot: ticketId,
+      label: meta?.label || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
-function shouldEmit(evt: NarrationEvent): boolean {
-  const last = lastLoggedTs.get(evt.agent);
-  if (last === evt.ts) return false;
-  lastLoggedTs.set(evt.agent, evt.ts);
+// A worker's post lands in now.md AND in its ticket's post file (feed-post.mjs
+// copies it a moment after the Write). The slot event is the one worth keeping,
+// since it carries the label, so a now.md change that just repeats a recent slot
+// post is dropped. Window is generous: the copy runs in a separate hook process.
+const NOW_DUP_WINDOW_MS = 2 * 60 * 1000;
+// now.md waits this long before it is read, so the slot copy is on disk first.
+const NOW_SETTLE_MS = 1500;
+
+async function duplicatesSlotPost(evt: NarrationEvent): Promise<boolean> {
+  for (const id of await listLivePostIds(evt.agent)) {
+    const post = await readPost(evt.agent, id);
+    if (
+      post &&
+      post.kind === evt.kind &&
+      post.text === evt.text &&
+      Math.abs(post.ts - evt.ts) <= NOW_DUP_WINDOW_MS
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Dedupe key: one per agent for now.md, one per agent and slot for post files. */
+function feedKey(evt: Pick<NarrationEvent, "agent" | "slot">): string {
+  return evt.slot ? `${evt.agent}/${evt.slot}` : evt.agent;
+}
+
+interface SeenState {
+  ts: Map<string, number>;
+  text: Map<string, string>;
+}
+
+/** True (and recorded) if evt is new to this state: a different write than the
+ *  last one seen for its key, and for a slot, not a re-post of identical text
+ *  (an agent retrying a Write after a sibling touched now.md re-sends it). */
+function isNewTo(seen: SeenState, evt: NarrationEvent): boolean {
+  const key = feedKey(evt);
+  if (seen.ts.get(key) === evt.ts) return false;
+  const sig = `${evt.kind}\n${evt.text}`;
+  if (evt.slot && seen.text.get(key) === sig) return false;
+  seen.ts.set(key, evt.ts);
+  seen.text.set(key, sig);
   return true;
 }
+
+// Module-level: shared across SSE connections in the same Node process, so each
+// write is appended to the feed log once even though every open connection has
+// its own watcher. Sending is tracked per connection (see GET); sharing that too
+// meant two open dashboards split the live events between them.
+const logged: SeenState = { ts: new Map(), text: new Map() };
+const lastLoggedTs = logged.ts;
+const lastLoggedText = logged.text;
 
 async function appendToFeedLog(evt: NarrationEvent): Promise<void> {
   try {
@@ -160,20 +232,33 @@ export async function GET(request: Request) {
 
       // Seed dedupe map from history so we don't re-log known events after a restart.
       for (const evt of history) {
-        const prior = lastLoggedTs.get(evt.agent) ?? 0;
-        if (evt.ts > prior) lastLoggedTs.set(evt.agent, evt.ts);
+        const key = feedKey(evt);
+        const prior = lastLoggedTs.get(key) ?? 0;
+        if (evt.ts > prior) {
+          lastLoggedTs.set(key, evt.ts);
+          lastLoggedText.set(key, `${evt.kind}\n${evt.text}`);
+        }
       }
 
-      // Send each agent's current now.md as the latest state.
-      // (Helps after a restart where the JSONL might lag the now.md.)
+      // Send each agent's current now.md, and each in-flight slot's post, as the
+      // latest state. (Helps after a restart where the JSONL might lag the files.)
       const agents = await listAgentSlugs();
       for (const agent of agents) {
-        const evt = await readNow(agent);
-        if (!evt) continue;
-        const prior = lastLoggedTs.get(agent) ?? 0;
-        if (evt.ts > prior) {
-          lastLoggedTs.set(agent, evt.ts);
-          safeEnqueue(sseFrame(JSON.stringify(evt)));
+        const current: NarrationEvent[] = [];
+        for (const id of await listLivePostIds(agent)) {
+          const post = await readPost(agent, id);
+          if (post) current.push(post);
+        }
+        const nowEvt = await readNow(agent);
+        if (nowEvt && !(await duplicatesSlotPost(nowEvt))) current.push(nowEvt);
+        for (const evt of current.sort((a, b) => a.ts - b.ts)) {
+          const key = feedKey(evt);
+          const prior = lastLoggedTs.get(key) ?? 0;
+          if (evt.ts > prior) {
+            lastLoggedTs.set(key, evt.ts);
+            lastLoggedText.set(key, `${evt.kind}\n${evt.text}`);
+            safeEnqueue(sseFrame(JSON.stringify(evt)));
+          }
         }
       }
 
@@ -183,19 +268,26 @@ export async function GET(request: Request) {
 
       const watchers: FSWatcher[] = [];
       const emitTimers = new Map<string, NodeJS.Timeout>();
+      // What this connection has been sent, seeded with the replay above.
+      const sent: SeenState = { ts: new Map(lastLoggedTs), text: new Map(lastLoggedText) };
 
-      const debouncedEmit = (agent: string) => {
-        const key = agent;
+      // slot = ticket id for a posts/<ticket>.md change, null for now.md.
+      const debouncedEmit = (agent: string, slot: string | null) => {
+        const key = slot ? `${agent}/${slot}` : agent;
         const prior = emitTimers.get(key);
         if (prior) clearTimeout(prior);
-        const t = setTimeout(async () => {
-          emitTimers.delete(key);
-          const evt = await readNow(agent);
-          if (!evt) return;
-          if (!shouldEmit(evt)) return; // dedupe across leaked watchers
-          await appendToFeedLog(evt);
-          safeEnqueue(sseFrame(JSON.stringify(evt)));
-        }, 150);
+        const t = setTimeout(
+          async () => {
+            emitTimers.delete(key);
+            const evt = slot ? await readPost(agent, slot) : await readNow(agent);
+            if (!evt) return;
+            if (!slot && (await duplicatesSlotPost(evt))) return; // the slot event has it
+            if (isNewTo(logged, evt)) await appendToFeedLog(evt); // first watcher logs it
+            if (!isNewTo(sent, evt)) return; // already on this connection
+            safeEnqueue(sseFrame(JSON.stringify(evt)));
+          },
+          slot ? 150 : NOW_SETTLE_MS
+        );
         emitTimers.set(key, t);
       };
 
@@ -210,8 +302,9 @@ export async function GET(request: Request) {
             if (!filename) return;
             const rel = filename.toString().replace(/\\/g, "/");
             const m = rel.match(/^([^/]+)\/now\.md$/);
-            if (!m) return;
-            debouncedEmit(m[1]);
+            if (m) return debouncedEmit(m[1], null);
+            const p = rel.match(new RegExp(`^([^/]+)/${POSTS_DIRNAME}/([A-Za-z0-9_-]+)\\.md$`));
+            if (p) debouncedEmit(p[1], p[2]);
           }
         );
         w.on("error", () => {});

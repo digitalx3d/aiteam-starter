@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavSidebar } from "@/components/nav-sidebar";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { VisualViewportSync } from "@/components/visual-viewport-sync";
 import { LightboxProvider } from "@/components/lightbox";
 import { OwnerProvider } from "@/components/owner-context";
 import { getOwnerName } from "@/lib/config";
@@ -41,6 +42,11 @@ export const viewport: Viewport = {
   themeColor: "#282828",
   width: "device-width",
   initialScale: 1,
+  // The installed iPhone app uses the black-translucent status bar, which draws
+  // the page underneath the clock and battery. "cover" makes the safe-area
+  // insets real numbers so the mobile top bar and body padding (globals.css)
+  // can step around the notch and the home indicator. No effect on desktop.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -60,7 +66,9 @@ export default function RootLayout({
           {/* Mobile top bar — only visible on small screens. The NavSidebar renders
               the hamburger button itself (fixed-position); this bar provides the
               app title and safe spacing so page content isn't hidden behind the button. */}
-          <div className="md:hidden flex items-center gap-3 px-4 h-12 bg-cards-bg border-b border-border shrink-0">
+          {/* The top inset pads this bar down past the iPhone status bar (the
+              installed app draws underneath it, see viewportFit above). */}
+          <div className="md:hidden flex items-center gap-3 px-4 h-[calc(3rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-cards-bg border-b border-border shrink-0">
             {/* Spacer reserving room for the fixed hamburger button at left-3 */}
             <div className="w-10 shrink-0" aria-hidden="true" />
             <span className="text-sm font-semibold tracking-tight">aiTeam</span>
@@ -70,6 +78,7 @@ export default function RootLayout({
             <main className="flex-1 flex flex-col min-w-0">{children}</main>
           </div>
           <ServiceWorkerRegister />
+          <VisualViewportSync />
         </LightboxProvider>
         </OwnerProvider>
       </body>

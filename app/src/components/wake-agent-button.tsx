@@ -56,7 +56,7 @@ export function WakeAgentButton({ agentName }: { agentName: string }) {
       onClick={onClick}
       disabled={state === "sending"}
       title={`Wake ${agentName} — dispatches ${agentName} to work their highest-priority assigned task; the report lands in the dashboard chat`}
-      className="inline-flex items-center gap-1 rounded-full border border-accent-2/50 bg-accent-2/10 px-2 py-0.5 text-[11px] font-medium text-accent-2 hover:bg-accent-2/20 hover:border-accent-2 transition-colors disabled:opacity-60"
+      className="inline-flex items-center gap-1 rounded-full border border-accent-2/50 bg-accent-2/10 px-2 py-0.5 max-md:min-h-9 max-md:px-3 text-[11px] font-medium text-accent-2 hover:bg-accent-2/20 hover:border-accent-2 transition-colors disabled:opacity-60"
     >
       <Icon className={"h-3 w-3" + (state === "sending" ? " animate-spin" : "")} />
       <span>{label}</span>

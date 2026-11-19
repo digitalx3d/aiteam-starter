@@ -52,16 +52,26 @@ function getCommonFlags(permissionMode: string = DEFAULT_PERMISSION_MODE): strin
   ];
 }
 
+/**
+ * The effort that will actually be applied for a given model. Effort is
+ * unsupported on haiku, so it's dropped there. Exported so callers can record
+ * what a spawn really ran with instead of what they asked for.
+ */
+export function effectiveEffort(
+  model: string | null | undefined,
+  effort: string | null | undefined
+): string | null {
+  if (!effort) return null;
+  return /haiku/i.test(model ?? "") ? null : effort;
+}
+
 export function spawnClaude(opts: SpawnOptions): SpawnResult {
   const sessionFlag = opts.resume
     ? ["--resume", opts.sessionId]
     : ["--session-id", opts.sessionId];
   const modelFlag = opts.model ? ["--model", opts.model] : [];
-  // Effort is unsupported on haiku; passing it there would error, so skip it.
-  const effortFlag =
-    opts.effort && !/haiku/i.test(opts.model ?? "")
-      ? ["--effort", opts.effort]
-      : [];
+  const effort = effectiveEffort(opts.model, opts.effort);
+  const effortFlag = effort ? ["--effort", effort] : [];
   const allowedFlag =
     opts.allowedTools && opts.allowedTools.length > 0
       ? ["--allowedTools", opts.allowedTools.join(",")]

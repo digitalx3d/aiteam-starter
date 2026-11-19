@@ -12,62 +12,102 @@ import {
 } from "lucide-react";
 import { Markdown } from "./markdown";
 import { useOwner } from "./owner-context";
-import type { InboxEntry, InboxPriority } from "@/lib/inbox-parse";
+import type { InboxEntry } from "@/lib/inbox-parse";
 
-const READ_KEY = "aiteam.inbox.readIds";
+// Read state used to live here in localStorage, which made it per-browser: what
+// read on a phone stayed unread on the desktop. It now lives on the
+// server (~/.aiteam/inbox-state.json). This key is only read once, to carry the
+// existing per-browser state up to the server, and is then removed.
+const LEGACY_READ_KEY = "aiteam.inbox.readIds";
 const READ_CHANGED_EVENT = "aiteam-inbox-read-state-changed";
 
-function loadReadIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(READ_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed.map(String));
-  } catch {
-    /* ignore */
-  }
-  return new Set();
-}
-
-function saveReadIds(ids: Set<string>): void {
+/** Tell the sidebar badge to refresh; storage events do not fire in this tab. */
+function broadcastReadChange(): void {
   if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(READ_CHANGED_EVENT));
+}
+
+/** Returns the server's full read list, or null if the write did not land. */
+async function postRead(ids: string[], read: boolean): Promise<string[] | null> {
   try {
-    window.localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
-    window.dispatchEvent(new Event(READ_CHANGED_EVENT));
+    const res = await fetch("/api/inbox/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, read }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { read?: unknown };
+    return Array.isArray(data.read) ? data.read.map(String) : null;
   } catch {
-    /* ignore */
+    return null;
   }
 }
 
-type PriorityFilter = "all" | InboxPriority;
+/**
+ * "2026-08-15 5:30 PM" in the viewer's own timezone, matching the task board.
+ *
+ * A leading "~" means the entry never stated a time and this is when the
+ * dashboard first saw it. Falls back to the raw header stamp when there is no
+ * usable time at all.
+ */
+function formatPosted(entry: InboxEntry): string {
+  // Some older headers lead with a "[HIGH]"-style tag; the priority already has
+  // its own badge, so drop it from the stamp.
+  const headerStamp = entry.timestamp.replace(/^\[[^\]]*\]\s*/, "");
+  if (!entry.postedAt) return headerStamp;
+  const d = new Date(entry.postedAt);
+  if (Number.isNaN(d.getTime())) return headerStamp;
+  const date = [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return date + " " + (entry.postedAtApprox ? "~" : "") + time;
+}
+
+function postedTooltip(entry: InboxEntry): string {
+  if (!entry.postedAt) {
+    return "This entry states only a date, and it predates the posting-time stamping";
+  }
+  if (entry.postedAtApprox) {
+    return "Approximate: the entry states only a date, so this is when the dashboard first saw it";
+  }
+  return "Posting time stated by the entry";
+}
+
 type AgentFilter = "any" | string;
 
-const PRIORITY_BADGE: Record<InboxPriority, string> = {
-  high: "bg-error/15 text-error border-error/30",
-  medium: "bg-accent-2/10 text-accent-2 border-accent-2/30",
-  low: "bg-muted-bg text-muted border-border",
-};
-
-// Canonical team roster from the inbox-shared.md header rules. Listed in the
-// order the owner reads them. "all" is a broadcast marker, only valid for `to`.
-const FROM_ROSTER = ["john", "cvb", "maya", "devin", "casey", "indy", "ethan"] as const;
-const TO_ROSTER = ["john", "cvb", "maya", "devin", "casey", "indy", "ethan"] as const;
+/** Shown, and filtered on, for posts that name no project (digests, disk alerts). */
+const NO_PROJECT = "General";
 
 const DISPLAY_NAME: Record<string, string> = {
   cvb: "CVB",
   maya: "Maya",
   devin: "Devin",
   casey: "Casey",
-  indy: "Indy",
-  ethan: "Ethan",
-  all: "All",
+  all: "Everyone",
+  everyone: "Everyone",
+  team: "Everyone",
 };
 
-// The "john" slug renders as the configured owner's first name (via useOwner).
+// "owner", or the owner's own first name, renders as the configured owner's
+// first name (via useOwner).
 function makeDisplayName(ownerFirst: string) {
-  return (slug: string): string =>
-    slug === "john" ? ownerFirst : DISPLAY_NAME[slug] || slug;
+  return (slug: string): string => {
+    const key = slug.toLowerCase();
+    if (key === "owner" || key === ownerFirst.toLowerCase()) return ownerFirst;
+    return DISPLAY_NAME[key] || slug.charAt(0).toUpperCase() + slug.slice(1);
+  };
+}
+
+/** The "To:" line. A post that names no one reaches the Inbox only because it is for the owner. */
+function recipientsLabel(to: string[], displayName: (slug: string) => string): string {
+  if (to.length === 0) return displayName("owner");
+  return [...new Set(to.map(displayName))].join(", ");
 }
 
 export function InboxView() {
@@ -75,107 +115,151 @@ export function InboxView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  // `loaded` gates the persist effect so it never runs with the pre-load
-  // empty Set. Without this, on every fresh mount the persist effect would
-  // fire before the load effect's setReadIds took effect and would wipe
-  // localStorage with `[]` — a subtle bug that turned all read entries back
-  // to unread after any hot-reload or Strict-Mode double-mount.
-  const [loaded, setLoaded] = useState(false);
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [fromFilter, setFromFilter] = useState<AgentFilter>("any");
-  const [toFilter, setToFilter] = useState<AgentFilter>("any");
+  const [projectFilter, setProjectFilter] = useState<AgentFilter>("any");
 
-  // Load read state from localStorage on mount. `loaded` flips true after
-  // the load lands so the persist effect can start running.
-  useEffect(() => {
-    setReadIds(loadReadIds());
-    setLoaded(true);
-  }, []);
-
-  // Persist + broadcast whenever readIds actually changes. Doing this in an
-  // effect (instead of inside the setReadIds updater) keeps the updater pure,
-  // which is required because React may call updaters during render and the
-  // broadcast triggers setState in a sibling component (InboxUnreadBadge).
-  useEffect(() => {
-    if (!loaded) return;
-    saveReadIds(readIds);
-  }, [readIds, loaded]);
-
-  // Fetch entries on mount + on window focus (so a fresh post by an agent shows
-  // up next time the owner tabs back).
-  const fetchEntries = useCallback(async () => {
+  // Entries AND read state both come from the server now, in one request.
+  // Fetched on mount + on window focus, so a fresh post by an agent shows up
+  // next time the owner tabs back. Returns the server read set so the caller can
+  // run the one-time migration against it.
+  const fetchEntries = useCallback(async (): Promise<Set<string> | undefined> => {
     try {
       const res = await fetch("/api/inbox", { cache: "no-store" });
-      const data = (await res.json()) as { entries: InboxEntry[]; error?: string };
+      const data = (await res.json()) as {
+        entries: InboxEntry[];
+        read?: string[];
+        error?: string;
+      };
       if (data.error) {
         setError(data.error);
-        return;
+        return undefined;
       }
       setError(null);
       setEntries(data.entries);
+      const serverRead = new Set(data.read ?? []);
+      setReadIds(serverRead);
+      return serverRead;
     } catch (err) {
       setError((err as Error).message);
+      return undefined;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // One-time carry-up of the old per-browser read state. Runs after the first
+  // fetch so it can skip ids the server already knows, and clears the local key
+  // only once the server has accepted them.
+  const migrateLegacyReadIds = useCallback(async (serverRead: Set<string>) => {
+    if (typeof window === "undefined") return;
+    let legacy: string[] = [];
+    try {
+      const raw = window.localStorage.getItem(LEGACY_READ_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) legacy = parsed.map(String);
+    } catch {
+      window.localStorage.removeItem(LEGACY_READ_KEY);
+      return;
+    }
+    const missing = legacy.filter((id) => id && !serverRead.has(id));
+    if (missing.length === 0) {
+      window.localStorage.removeItem(LEGACY_READ_KEY);
+      return;
+    }
+    const merged = await postRead(missing, true);
+    if (!merged) return; // leave the key in place and retry on the next load
+    window.localStorage.removeItem(LEGACY_READ_KEY);
+    setReadIds(new Set(merged));
+    broadcastReadChange();
+  }, []);
+
   useEffect(() => {
-    fetchEntries();
-    const onFocus = () => fetchEntries();
+    let migrated = false;
+    const run = async () => {
+      const serverRead = await fetchEntries();
+      if (serverRead && !migrated) {
+        migrated = true;
+        await migrateLegacyReadIds(serverRead);
+      }
+    };
+    void run();
+    const onFocus = () => {
+      void fetchEntries();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [fetchEntries]);
+  }, [fetchEntries, migrateLegacyReadIds]);
 
-  const markRead = useCallback((id: string) => {
-    setReadIds((prev) => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, []);
+  // Optimistic: flip the UI immediately, then persist. If the write does not
+  // land, re-read from the server rather than leaving the screen showing a
+  // state the server never accepted.
+  const applyRead = useCallback(
+    async (ids: string[], read: boolean) => {
+      if (ids.length === 0) return;
+      setReadIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) {
+          if (read) next.add(id);
+          else next.delete(id);
+        }
+        return next;
+      });
+      const serverRead = await postRead(ids, read);
+      if (serverRead) setReadIds(new Set(serverRead));
+      else await fetchEntries();
+      broadcastReadChange();
+    },
+    [fetchEntries]
+  );
 
-  const markUnread = useCallback((id: string) => {
-    setReadIds((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
+  const markRead = useCallback(
+    (id: string) => {
+      void applyRead([id], true);
+    },
+    [applyRead]
+  );
+
+  const markUnread = useCallback(
+    (id: string) => {
+      void applyRead([id], false);
+    },
+    [applyRead]
+  );
 
   const markAllRead = useCallback(() => {
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const e of entries) {
-        if (!next.has(e.id)) {
-          next.add(e.id);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [entries]);
+    void applyRead(
+      entries.filter((e) => !readIds.has(e.id)).map((e) => e.id),
+      true
+    );
+  }, [applyRead, entries, readIds]);
 
-  const filtered = useMemo(() => {
-    const fromKey = fromFilter.toLowerCase();
-    const toKey = toFilter.toLowerCase();
-    return entries.filter((e) => {
-      if (priorityFilter !== "all" && e.priority !== priorityFilter) return false;
-      if (fromKey !== "any" && e.from.toLowerCase() !== fromKey) return false;
-      if (toKey !== "any") {
-        // A broadcast (`to: all`) counts as addressed to everyone, so it
-        // matches any specific recipient filter too.
-        const recipients = e.to.map((s) => s.toLowerCase());
-        if (!recipients.includes(toKey) && !recipients.includes("all")) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [entries, priorityFilter, fromFilter, toFilter]);
+  // Senders as their names appear on the cards, so the list never offers
+  // someone with nothing in the Inbox.
+  const senders = useMemo(
+    () => [...new Set(entries.map((e) => e.agent))].sort((a, b) => a.localeCompare(b)),
+    [entries]
+  );
+
+  const projects = useMemo(
+    () =>
+      [...new Set(entries.map((e) => e.project ?? NO_PROJECT))].sort((a, b) =>
+        a === NO_PROJECT ? 1 : b === NO_PROJECT ? -1 : a.localeCompare(b)
+      ),
+    [entries]
+  );
+
+  const filtered = useMemo(
+    () =>
+      entries.filter((e) => {
+        if (urgentOnly && e.priority !== "high") return false;
+        if (fromFilter !== "any" && e.agent !== fromFilter) return false;
+        if (projectFilter !== "any" && (e.project ?? NO_PROJECT) !== projectFilter) return false;
+        return true;
+      }),
+    [entries, urgentOnly, fromFilter, projectFilter]
+  );
 
   const unreadCount = useMemo(
     () => entries.filter((e) => !readIds.has(e.id)).length,
@@ -199,53 +283,35 @@ export function InboxView() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-muted text-xs px-1">
+            <Filter className="h-3 w-3 inline" />
+          </span>
+          <AgentSelect
+            label="Project"
+            value={projectFilter}
+            onChange={setProjectFilter}
+            options={projects}
+            highlighted={projectFilter !== "any"}
+          />
           <AgentSelect
             label="From"
             value={fromFilter}
             onChange={setFromFilter}
-            options={FROM_ROSTER}
+            options={senders}
             highlighted={fromFilter !== "any"}
           />
-          <AgentSelect
-            label="To"
-            value={toFilter}
-            onChange={setToFilter}
-            options={TO_ROSTER}
-            highlighted={toFilter !== "any"}
-          />
-          <span className="text-muted text-xs px-1">
-            <Filter className="h-3 w-3 inline" />
-          </span>
           <FilterChip
-            active={priorityFilter === "all"}
-            onClick={() => setPriorityFilter("all")}
-          >
-            Any priority
-          </FilterChip>
-          <FilterChip
-            active={priorityFilter === "high"}
-            onClick={() => setPriorityFilter("high")}
+            active={urgentOnly}
+            onClick={() => setUrgentOnly((v) => !v)}
             tone="error"
           >
-            High
-          </FilterChip>
-          <FilterChip
-            active={priorityFilter === "medium"}
-            onClick={() => setPriorityFilter("medium")}
-          >
-            Medium
-          </FilterChip>
-          <FilterChip
-            active={priorityFilter === "low"}
-            onClick={() => setPriorityFilter("low")}
-          >
-            Low
+            Urgent only
           </FilterChip>
           <button
             type="button"
             onClick={markAllRead}
             disabled={unreadCount === 0}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/50 px-3 py-1 text-xs text-muted hover:text-foreground hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/50 px-3 py-1 max-md:min-h-9 text-xs text-muted hover:text-foreground hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <CheckCheck className="h-3 w-3" />
             Mark all read
@@ -300,7 +366,6 @@ function AgentSelect({
   options: readonly string[];
   highlighted: boolean;
 }) {
-  const displayName = makeDisplayName(useOwner().first);
   return (
     <label
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors cursor-pointer ${
@@ -316,9 +381,9 @@ function AgentSelect({
         className="bg-transparent border-0 outline-none text-[11px] font-medium pr-1 cursor-pointer focus:outline-none"
       >
         <option value="any">Any</option>
-        {options.map((slug) => (
-          <option key={slug} value={slug}>
-            {displayName(slug)}
+        {options.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
@@ -338,7 +403,7 @@ function FilterChip({
   tone?: "error";
 }) {
   const base =
-    "rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40";
+    "rounded-full border px-2.5 py-1 max-md:min-h-9 text-[11px] transition-colors disabled:opacity-40";
   const inactive =
     "border-border bg-background/40 text-muted hover:text-foreground hover:border-foreground/30";
   const activeCls =
@@ -368,7 +433,6 @@ function EntryCard({
   onMarkUnread: () => void;
 }) {
   const displayName = makeDisplayName(useOwner().first);
-  const priorityCls = PRIORITY_BADGE[entry.priority];
   // Default state mirrors read state: unread → expanded, read → collapsed.
   // User can still click the header to override at any time. Marking
   // read/unread snaps back to the matching default via the sync effect below.
@@ -406,36 +470,43 @@ function EntryCard({
             <ChevronRight className="h-4 w-4 text-muted shrink-0 mt-0.5" />
           )}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={`text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border ${priorityCls}`}
-              >
-                {entry.priority}
-              </span>
-              <span className="text-xs font-semibold text-foreground/90">
-                {entry.agent}
-              </span>
-              <span className="text-xs text-muted font-mono">{entry.timestamp}</span>
-              {entry.to.length > 0 && (
-                <span className="text-[10px] text-muted">
-                  → {entry.to.map(displayName).join(", ")}
-                </span>
-              )}
-            </div>
             <h2
-              className={`text-sm mt-1 leading-snug ${
+              className={`text-sm leading-snug ${
                 isRead ? "text-foreground/75" : "font-semibold text-foreground"
               }`}
             >
+              {entry.priority === "high" && (
+                <span className="mr-2 align-[1px] text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border bg-error/15 text-error border-error/30">
+                  Urgent
+                </span>
+              )}
               {entry.title}
             </h2>
+            <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-xs">
+              <dt className="text-muted">Project:</dt>
+              <dd>
+                {entry.project ? (
+                  <span className="font-semibold text-accent">{entry.project}</span>
+                ) : (
+                  <span className="text-muted">{NO_PROJECT}</span>
+                )}
+              </dd>
+              <dt className="text-muted">From:</dt>
+              <dd className="text-foreground/90 font-medium">{entry.agent}</dd>
+              <dt className="text-muted">To:</dt>
+              <dd className="text-foreground/80">{recipientsLabel(entry.to, displayName)}</dd>
+              <dt className="text-muted">Date:</dt>
+              <dd className="text-muted font-mono" title={postedTooltip(entry)}>
+                {formatPosted(entry)}
+              </dd>
+            </dl>
           </div>
         </button>
         <button
           type="button"
           onClick={isRead ? onMarkUnread : onMarkRead}
           title={isRead ? "Mark as unread" : "Mark as read"}
-          className="shrink-0 mt-3 mr-4 inline-flex items-center gap-1 rounded-full border border-border bg-background/50 px-2 py-0.5 text-[11px] text-muted hover:text-foreground hover:border-foreground/30 transition-colors"
+          className="shrink-0 mt-3 mr-4 inline-flex items-center gap-1 rounded-full border border-border bg-background/50 px-2 py-0.5 max-md:min-h-9 max-md:px-3 text-[11px] text-muted hover:text-foreground hover:border-foreground/30 transition-colors"
         >
           <Check className="h-3 w-3" />
           {isRead ? "Read" : "Mark read"}

@@ -523,7 +523,7 @@ function NoteCardPreview({
           e.stopPropagation();
           onDelete();
         }}
-        className="absolute top-2 right-2 text-muted hover:text-error p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-2 right-2 text-muted hover:text-error p-1 max-md:p-2.5 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity z-10"
         title="Delete note"
       >
         <Trash2 className="h-3.5 w-3.5" />

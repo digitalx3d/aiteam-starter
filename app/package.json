@@ -6,7 +6,8 @@
     "dev": "next dev --port 3900 --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --port 3900 --hostname 127.0.0.1",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",

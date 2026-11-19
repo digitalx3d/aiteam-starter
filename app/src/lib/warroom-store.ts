@@ -23,7 +23,7 @@ export type WarRoomRole = "facilitator" | "agent" | "human";
 export interface WarRoomMessage {
   id: string;
   role: WarRoomRole;
-  /** Name key: "claude" (facilitator), "john" (human), or an agent name. */
+  /** Name key: "claude" (facilitator), "owner" (human), or an agent name. */
   agent: string;
   displayName: string;
   color: string;

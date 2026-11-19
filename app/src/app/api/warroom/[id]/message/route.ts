@@ -13,14 +13,14 @@ interface Params {
   params: Promise<{ id: string }>;
 }
 
-// The human owner. The "john" slug is the stable internal id; the display
+// The human owner. The "owner" slug is the stable internal id; the display
 // name comes from config.
 function ownerMember() {
   return {
-    name: "john",
+    name: "owner",
     displayName: getOwnerName().first,
     color: "purple",
-    avatarUrl: "/avatars/john.webp" as string | null,
+    avatarUrl: "/avatars/owner.webp" as string | null,
   };
 }
 

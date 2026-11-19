@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Users, ChevronRight, ChevronDown, Wrench } from "lucide-react";
 import { AgentAvatar } from "@/components/agent-avatar";
+import { QueuedDispatches } from "@/components/queued-dispatches";
 import type { DispatchTicket } from "@/lib/dispatch-store";
 import type { FeedEntry } from "@/lib/dispatch-transcript";
 
@@ -48,6 +49,51 @@ function timeAgo(ts: number, now: number): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+/** "claude-opus-5" / "opus" -> "Opus". Keeps anything unrecognized readable. */
+function fmtModel(model: string): string {
+  const m = model.toLowerCase();
+  for (const known of ["opus", "sonnet", "haiku", "fable"]) {
+    if (m.includes(known)) return known.charAt(0).toUpperCase() + known.slice(1);
+  }
+  return model.replace(/^claude-/, "");
+}
+
+const EFFORT_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "xHigh",
+  max: "Max",
+};
+
+/**
+ * "Opus · xHigh" — what this worker is actually running on, so a slow dispatch
+ * explains itself at a glance. Older tickets predate the fields and show nothing.
+ */
+function SpawnBadge({
+  model,
+  effort,
+}: {
+  model: string | null | undefined;
+  effort: string | null | undefined;
+}) {
+  const parts: string[] = [];
+  if (model) parts.push(fmtModel(model));
+  if (effort) parts.push(EFFORT_LABELS[effort.toLowerCase()] ?? effort);
+  if (parts.length === 0) return null;
+  return (
+    <span
+      className="shrink-0 inline-flex items-center rounded-full border border-border px-1.5 py-0.5 text-[10px] font-mono text-muted"
+      title={
+        `Running on ${model ?? "the default model"}` +
+        (effort ? ` at ${effort} reasoning effort` : "")
+      }
+    >
+      {parts.join(" · ")}
+    </span>
+  );
 }
 
 /** First non-empty line of the brief, capped — "what they're working on". */
@@ -217,6 +263,8 @@ export function ProjectAgents({
         )}
       </div>
 
+      <QueuedDispatches slug={slug} agentMap={agentMap} />
+
       {nothing ? (
         <div className="rounded-lg border border-border bg-muted-bg px-4 py-10 text-center">
           <div className="text-sm text-foreground/70">
@@ -381,7 +429,7 @@ function TicketRow({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-sm font-semibold text-foreground/90">
               {displayName}
             </span>
@@ -397,6 +445,7 @@ function TicketRow({
                 {sv.label}
               </span>
             </span>
+            <SpawnBadge model={ticket.model} effort={ticket.effort} />
             <span className="text-[11px] text-muted ml-auto whitespace-nowrap">
               {timing}
             </span>

@@ -25,8 +25,29 @@ export interface DispatchTicket {
   createdAt: number;
   startedAt: number | null;
   finishedAt: number | null;
-  /** One-line summary the worker reported on completion (or last assistant text). */
+  /** One-line summary the worker reported on completion (or last assistant text).
+   *  Deliberately short — it feeds the Live Feed and the chat bubble. For anything
+   *  that needs the whole story, use `report`. */
   summary: string | null;
+  /** The worker's complete final message, unabridged.
+   *
+   *  `summary` caps at 600 chars, which truncated 64% of reports mid-sentence and
+   *  lost up to 83% of their content — including things that mattered, like a
+   *  worker standing down because it detected two agents editing the same files.
+   *  Previously this text was computed, used to derive `summary`, then discarded;
+   *  the only surviving copy was buried in the multi-hundred-KB raw stream at
+   *  .dispatches/<id>.jsonl, which nothing read. */
+  report: string | null;
+  /** True when CVB asked for a security review on this line of work. It is the
+   *  ONLY thing that lets a ===HANDOFF=== auto-fire (see dispatch-handoff.ts):
+   *  a worker cannot authorize its own review. Propagates down a handoff chain so
+   *  an authorized review can hand back for fixes. */
+  securityReview?: boolean;
+  /** Absolute (or repo-relative) path to the worker's full write-up, pulled from
+   *  the report before the summary cap could truncate it away. Null when the
+   *  report names no such file. Rendered with the chat post so a "see the review"
+   *  report always says WHERE. */
+  reportPath?: string | null;
   /** Non-zero exit / spawn error message, when status=failed. */
   errorMessage: string | null;
   /** Board task this dispatch is tied to (auto-created or referenced). null if none. */
@@ -35,6 +56,13 @@ export interface DispatchTicket {
   parentTicketId: string | null;
   /** Auto-handoff hop count. 0 for a root (CVB-initiated) dispatch; +1 per auto-hop. */
   chainDepth: number;
+  /** Model this worker was spawned on, after resolving request > persona.
+   *  Null means no --model flag was passed and the CLI default applied.
+   *  Recorded so the Agents tab can show what's actually running. */
+  model: string | null;
+  /** Reasoning effort for this spawn, same resolution order. Null means no
+   *  --effort flag was passed. */
+  effort: string | null;
 }
 
 const DISPATCHES_DIR = path.join(process.cwd(), ".dispatches");
@@ -119,14 +147,27 @@ export interface CreateTicketInput {
   cwd: string;
   parentTicketId?: string | null;
   chainDepth?: number;
+  model?: string | null;
+  effort?: string | null;
+  /** CVB asked for a security review on this line of work. Gates auto-handoff. */
+  securityReview?: boolean;
+  /** Use this id instead of a fresh one: a job released from the dispatch queue
+   *  keeps the id it was given when queued. The ticket file is then created
+   *  exclusively, so the same queued job can never become two tickets. */
+  id?: string;
 }
 
 export async function createTicket(
   init: CreateTicketInput
 ): Promise<DispatchTicket> {
   await loadAll();
+  if (init.id) {
+    await ensureDir();
+    // Throws EEXIST if any process already created this ticket.
+    await fsp.writeFile(ticketPath(init.id), "{}", { encoding: "utf8", flag: "wx" });
+  }
   const t: DispatchTicket = {
-    id: randomUUID(),
+    id: init.id ?? randomUUID(),
     agent: init.agent,
     project: init.project,
     brief: init.brief,
@@ -138,10 +179,15 @@ export async function createTicket(
     startedAt: null,
     finishedAt: null,
     summary: null,
+    report: null,
+    reportPath: null,
+    securityReview: init.securityReview === true,
     errorMessage: null,
     taskId: null,
     parentTicketId: init.parentTicketId ?? null,
     chainDepth: init.chainDepth ?? 0,
+    model: init.model ?? null,
+    effort: init.effort ?? null,
   };
   tickets.set(t.id, t);
   await writeTicket(t);

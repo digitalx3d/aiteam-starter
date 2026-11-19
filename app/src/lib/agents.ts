@@ -15,7 +15,28 @@ export interface SubagentDef {
   description: string;
   tools?: string;
   model?: string;
+  /** Reasoning effort default for this agent (low|medium|high|xhigh|max).
+   *  Undefined when the frontmatter omits it or the value was invalid. */
+  effort?: string;
   color?: string;
+}
+
+/** The reasoning-effort levels the `--effort` CLI flag accepts. */
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+
+/**
+ * Normalizes a reasoning-effort value to a level the CLI accepts, or null.
+ * Case-insensitive. Anything unrecognized returns null so callers can fall
+ * through to "no --effort flag" rather than handing the CLI garbage — a typo
+ * in persona frontmatter must never break a dispatch.
+ */
+export function normalizeEffort(value: unknown): EffortLevel | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  return (EFFORT_LEVELS as readonly string[]).includes(v)
+    ? (v as EffortLevel)
+    : null;
 }
 
 export interface AgentProfile {
@@ -36,6 +57,8 @@ export interface AgentListing {
   color: string;
   tools?: string;
   model?: string;
+  /** Per-agent reasoning-effort default from frontmatter, if set and valid. */
+  effort?: string;
   completedCount: number;
   inboxBytes: number;
   lastActivityMs: number | null;
@@ -88,13 +111,13 @@ interface StaticTeamMember {
 
 // A function, not a const: the human entry's names come from the ownerName
 // config value, which can change between requests via the Settings page.
-// The "john" slug is the stable internal id (avatar filename, URL segment,
+// The "owner" slug is the stable internal id (avatar filename, URL segment,
 // chat-role mapping) and does not change with the display name.
 function staticTeamMembers(): StaticTeamMember[] {
   const owner = getOwnerName();
   return [
     {
-      name: "john",
+      name: "owner",
       lastName: owner.full.split(/\s+/).slice(1).join(" "),
       description: "Founder, product lead, and top of the team hierarchy.",
       color: "purple",
@@ -213,6 +236,9 @@ function parseSubagentFrontmatter(content: string): SubagentDef | null {
     description: fields.description ?? "",
     tools: fields.tools,
     model: fields.model,
+    // Invalid values are dropped here rather than surfaced, so a bad
+    // `effort:` line degrades to "no effort set" instead of failing a spawn.
+    effort: normalizeEffort(fields.effort) ?? undefined,
     color: fields.color,
   };
 }
@@ -245,6 +271,8 @@ function isSafeAgentName(name: string): boolean {
  *     scope. The worker reads its own soul/agents/tools/heartbeat/projects per
  *     the activation procedure embedded here.
  *   - allowedTools: tool names parsed from the frontmatter `tools:` line.
+ *   - model / effort: the agent's spawn defaults from frontmatter. Either may be
+ *     null, in which case the caller omits the flag and the CLI default applies.
  *
  * Returns null if the definition file doesn't exist or has no frontmatter.
  */
@@ -252,6 +280,7 @@ export async function loadAgentForDispatch(name: string): Promise<{
   systemPrompt: string;
   allowedTools: string[];
   model: string | null;
+  effort: string | null;
 } | null> {
   if (!isSafeAgentName(name)) return null;
   const { def, body } = await loadSubagentDef(name);
@@ -267,7 +296,12 @@ export async function loadAgentForDispatch(name: string): Promise<{
   const systemPrompt = operatingRules
     ? `${body}\n\n---\n\n${operatingRulesSection(operatingRules)}`
     : body;
-  return { systemPrompt, allowedTools, model: def.model ?? null };
+  return {
+    systemPrompt,
+    allowedTools,
+    model: def.model ?? null,
+    effort: def.effort ?? null,
+  };
 }
 
 async function loadSubagentDef(name: string): Promise<{
@@ -301,7 +335,7 @@ async function listAgentNames(): Promise<string[]> {
 
 async function staticListing(member: StaticTeamMember): Promise<AgentListing> {
   const avatarUrl = await avatarUrlIfExists(member.name);
-  // The human's display name comes from config, not from the "john" slug.
+  // The human's display name comes from config, not from the "owner" slug.
   const displayName =
     member.role === "human" ? getOwnerName().first : capitalize(member.name);
   return {
@@ -324,6 +358,19 @@ async function staticListing(member: StaticTeamMember): Promise<AgentListing> {
     },
     role: member.role,
   };
+}
+
+/**
+ * Just the canonical display names for the team, no profile/avatar/inbox
+ * reads. Used to reconcile assignee spellings on task files, which agents
+ * write by hand and usually spell in lowercase slug form ("devin").
+ */
+export async function agentDisplayNames(): Promise<string[]> {
+  const names = await listAgentNames();
+  const statics = staticTeamMembers().map((m) =>
+    m.role === "human" ? getOwnerName().first : capitalize(m.name)
+  );
+  return [...statics, ...names.map((n) => capitalize(n))];
 }
 
 export async function discoverAgents(): Promise<AgentListing[]> {
@@ -368,6 +415,7 @@ export async function discoverAgents(): Promise<AgentListing[]> {
       color: def.def?.color ?? "blue",
       tools: def.def?.tools,
       model: def.def?.model,
+      effort: def.def?.effort,
       completedCount,
       inboxBytes,
       lastActivityMs,
@@ -478,6 +526,7 @@ export async function getAgentDetail(name: string): Promise<AgentDetail | null> 
     color: def.def?.color ?? "blue",
     tools: def.def?.tools,
     model: def.def?.model,
+    effort: def.def?.effort,
     completedCount,
     inboxBytes,
     lastActivityMs,

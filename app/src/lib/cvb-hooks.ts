@@ -25,6 +25,7 @@ export function buildCvbHookSettings(): Record<string, unknown> {
   const guard = path.join(hooksDir, "cvb-guard.mjs").replace(/\\/g, "/");
   const clock = path.join(hooksDir, "cvb-clock.mjs").replace(/\\/g, "/");
   const feedGuard = path.join(hooksDir, "feed-guard.mjs").replace(/\\/g, "/");
+  const rulesGuard = path.join(hooksDir, "rules-guard.mjs").replace(/\\/g, "/");
   const agentsDir = cfg.agentsDir.replace(/\\/g, "/");
   return {
     hooks: {
@@ -37,6 +38,9 @@ export function buildCvbHookSettings(): Record<string, unknown> {
               type: "command",
               command: `node "${feedGuard}" --agent "claude" --project "any" --agents-dir "${agentsDir}"`,
             },
+            // Team rules that are code, not prose: reserved ports, persona
+            // location, no em dashes. Same guard the dispatched workers get.
+            { type: "command", command: `node "${rulesGuard}"` },
           ],
         },
       ],

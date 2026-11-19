@@ -3,9 +3,14 @@
 //   Start:   pm2 start ecosystem.config.js
 //   Persist: pm2 save     <- writes the dump that `pm2 resurrect` restores
 //
-// To bring it back after a reboot, have `pm2 resurrect` run at logon
-// (`pm2 startup` sets that up on Mac and Linux; on Windows use a Task
-// Scheduler task or the pm2-windows-startup package).
+// After a reboot, `pm2 resurrect` has to run at logon. Exactly ONE thing should
+// do that: two startup paths give you two pm2 daemons racing for the same port.
+//   Windows:     powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-pm2-startup.ps1
+//                (one logon task; verify after a restart with scripts/verify-startup.ps1)
+//   Mac / Linux: pm2 startup, then follow the command it prints.
+//
+// Rebuild and restart after an update: node scripts/deploy-dashboard.mjs
+// (refuses while a teammate is mid-task; a restart would kill them).
 //
 // Paths are derived from this file's location (__dirname) so there is no
 // hardcoded drive letter; this stays correct if the repo moves.

@@ -237,7 +237,7 @@ export function SettingsForm() {
           </div>
 
           <div className="flex items-center justify-between gap-4 pt-2 border-t border-border">
-            <p className="text-[11px] text-muted leading-relaxed">
+            <p className="min-w-0 max-md:[overflow-wrap:anywhere] text-[11px] text-muted leading-relaxed">
               Saved to <span className="font-mono">{data.settingsFile}</span>.
               Saved values override environment variables and defaults. Changes
               apply to new requests immediately; live activity streams pick
@@ -254,7 +254,7 @@ export function SettingsForm() {
                 type="button"
                 onClick={() => void save()}
                 disabled={dirty.size === 0 || saving}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 max-md:min-h-10 text-xs rounded bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 {saving && <Loader2 className="h-3 w-3 animate-spin" />}
                 Save changes

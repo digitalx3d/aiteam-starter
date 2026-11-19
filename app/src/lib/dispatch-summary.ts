@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { spawnClaude } from "./claude-spawn";
+// Path extraction lives in its own dependency-free module so it can be tested
+// against real reports without dragging in the spawn machinery.
+export { extractReportPath } from "./report-path";
 
 /*
  * dispatch-summary.ts — turn a worker's final message into a short, plain-English
@@ -19,9 +22,31 @@ import { spawnClaude } from "./claude-spawn";
 const REPORT_RE = /===\s*REPORT\s*===\s*([\s\S]*?)(?:===\s*END\s*===|$)/i;
 const MAX_LEN = 600;
 
-function cap(s: string): string {
+/**
+ * Trim to MAX_LEN at a sentence or line boundary rather than mid-word.
+ *
+ * The old version sliced at exactly 600 characters, which produced endings like
+ * "I scanned it separ..." and, memorably, a report severed while saying "Full
+ * det...". Falling back to the raw slice only when there's no usable break in the
+ * last half keeps a clean cut without ever dropping much more than necessary.
+ *
+ * This is the SHORT form, for the Live Feed and the chat bubble. The unabridged
+ * text is kept on the ticket as `report` — see DispatchTicket.
+ */
+function cap(s: string, tail = "[…full report on the ticket]"): string {
   const t = s.trim();
-  return t.length <= MAX_LEN ? t : t.slice(0, MAX_LEN - 3) + "...";
+  if (t.length <= MAX_LEN) return t;
+  const head = t.slice(0, MAX_LEN);
+  const stop = Math.max(
+    head.lastIndexOf(". "),
+    head.lastIndexOf("! "),
+    head.lastIndexOf("? "),
+    head.lastIndexOf("\n")
+  );
+  // Only honour a boundary in the back half, so we never lose most of the text
+  // chasing a tidy cut.
+  const cut = stop > MAX_LEN * 0.5 ? head.slice(0, stop + 1).trim() : head.trim();
+  return `${cut} ${tail}`;
 }
 
 function collapse(s: string): string {
@@ -125,12 +150,18 @@ async function compressToPlainLines(
  */
 export async function summarizeReport(
   text: string | null,
-  ctx: { cwd: string }
+  ctx: { cwd: string; ticketId?: string }
 ): Promise<string | null> {
   if (!text) return null;
 
+  // A truncated summary should say where the rest is. Without the id this reads
+  // as "go find it somewhere", which is the complaint this exists to fix.
+  const tail = ctx.ticketId
+    ? `[…full report on ticket ${ctx.ticketId.slice(0, 8)} — Agents tab]`
+    : "[…full report on the ticket]";
+
   const block = extractReportBlock(text);
-  if (block) return cap(block);
+  if (block) return cap(block, tail);
 
   const collapsed = collapse(text);
   if (collapsed.length <= 400) return collapsed;
@@ -141,5 +172,5 @@ export async function summarizeReport(
   } catch {
     /* fall through */
   }
-  return cap(collapsed);
+  return cap(collapsed, tail);
 }

@@ -158,10 +158,11 @@ function UsageInline() {
       <span>
         <span className={pctColor(five.pct)}>{five.pct}% used</span>. Resets {fmtReset(five.resetAt)}.
       </span>
+      {/* The weekly figure doesn't fit beside the five-hour one on a phone. */}
       {week && (
         <>
-          <span className="text-border">|</span>
-          <span>
+          <span className="hidden sm:inline text-border">|</span>
+          <span className="hidden sm:inline">
             All models: <span className={pctColor(week.pct)}>{week.pct}% used</span>. Resets{" "}
             {fmtReset(week.resetAt)}.
           </span>
@@ -184,7 +185,7 @@ export function ActivityPanel({ messages }: { messages: ChatMessage[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-4 py-2 text-xs hover:bg-background/40 text-left"
+        className="min-w-0 min-h-10 sm:min-h-0 flex items-center gap-2 px-4 py-2 text-xs hover:bg-background/40 text-left"
         aria-expanded={open}
       >
         {open ? (
@@ -210,7 +211,7 @@ export function ActivityPanel({ messages }: { messages: ChatMessage[] }) {
         <UsageInline />
       </div>
       {open && (
-        <div className="max-h-72 overflow-y-auto border-t border-border bg-background">
+        <div className="max-h-[40dvh] sm:max-h-72 overflow-y-auto border-t border-border bg-background">
           {total === 0 ? (
             <div className="px-4 py-6 text-xs text-muted text-center">
               No tool activity yet.

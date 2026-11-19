@@ -57,9 +57,12 @@ function formatCompletedDate(iso: string, now: number): string {
 
 interface ProjectBig3CardProps {
   slug: string;
+  /** Reports how many ideas are still open (null while loading). The phone
+   *  header shows it on the collapsed Big 3 chip. */
+  onSummary?: (openCount: number | null) => void;
 }
 
-export function ProjectBig3Card({ slug }: ProjectBig3CardProps) {
+export function ProjectBig3Card({ slug, onSummary }: ProjectBig3CardProps) {
   const [items, setItems] = useState<Big3Item[]>(padToSlots([]));
   const [completed, setCompleted] = useState<CompletedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +71,10 @@ export function ProjectBig3Card({ slug }: ProjectBig3CardProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const endpoint = `/api/projects/${encodeURIComponent(slug)}/big3`;
+
+  useEffect(() => {
+    onSummary?.(loading ? null : items.filter((i) => i.text.trim() && !i.done).length);
+  }, [items, loading, onSummary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +321,7 @@ export function ProjectBig3Card({ slug }: ProjectBig3CardProps) {
                   title={
                     item.done ? "Clear (archives to history)" : "Clear (discard)"
                   }
-                  className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted hover:text-error hover:bg-background/40 transition-opacity"
+                  className="shrink-0 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 p-0.5 max-md:p-2.5 max-md:-m-2 rounded text-muted hover:text-error hover:bg-background/40 transition-opacity"
                 >
                   <X className="h-3 w-3" />
                 </button>

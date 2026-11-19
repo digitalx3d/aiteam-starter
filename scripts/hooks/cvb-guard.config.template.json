@@ -1,24 +1,55 @@
 {
-  "_comment": "TEMPLATE for cvb-guard.config.json — the CVB (Claude Von Braun) PreToolUse bouncer. setup.mjs renders this by replacing the {{PLACEHOLDER}} tokens with your real paths (lowercase, forward slashes) and writing cvb-guard.config.json next to it. CVB may write COORDINATION artifacts, never DELIVERABLES, and never GOVERNANCE files. Tune behavior by editing the rendered file; no code changes needed. All path checks are case-insensitive and forward-slash-normalized.",
+  "_comment": "TEMPLATE for cvb-guard.config.json, the CVB (Claude Von Braun) PreToolUse bouncer. setup.mjs renders this by replacing the {{PLACEHOLDER}} tokens with your real paths (lowercase, forward slashes) and writing cvb-guard.config.json next to it. CVB may write COORDINATION artifacts and NOTES, never DELIVERABLES, and never GOVERNANCE files. Tune behavior by editing the rendered file; no code changes needed. All path checks are case-insensitive and forward-slash-normalized, so entries must be lowercase; on Windows both the `c:/...` and the git-bash `/c/...` spelling of a path are listed.",
 
-  "_writeAllow": "Paths CVB MAY Edit/Write. prefixes = startsWith; contains = substring; exact = full match.",
+  "_writeAllow": "Paths CVB MAY Edit/Write regardless of file type. prefixes = startsWith; contains = substring; exact = full match.",
   "writeAllowPrefixes": [
     "{{AGENTS_DIR}}/claude/",
-    "{{VAULT_DIR}}/"
+    "{{AGENTS_DIR_GITBASH}}/claude/",
+    "{{VAULT_DIR}}/",
+    "{{VAULT_DIR_GITBASH}}/"
   ],
   "writeAllowContains": [
     "/.aiteam/"
   ],
   "writeAllowExact": [
-    "{{AITEAM_DIR}}/inbox-shared.md"
+    "{{AITEAM_DIR}}/inbox-shared.md",
+    "{{AITEAM_DIR_GITBASH}}/inbox-shared.md"
   ],
 
-  "_writeAllowRegex": "Case-insensitive regex allow-patterns (matched against the normalized path). Covers CVB's own memory under any per-scope .claude/projects/<scope>/memory/ dir (his memory path varies by which chat he's in).",
+  "_writeAllowRegex": "Case-insensitive regex allow-patterns (matched against the normalized path). Covers CVB's own memory under any per-scope .claude/projects/<scope>/memory/ dir (his memory path varies by which chat he's in), and scratch/temp files anywhere (a staged brief or a captured command output is not a deliverable).",
   "writeAllowRegex": [
-    "\\.claude/projects/[^/]+/memory/"
+    "\\.claude/projects/[^/]+/memory/",
+    "^(/tmp/|/var/tmp/|/private/var/folders/|[a-z]:/(users/[^/]+/appdata/local/)?temp/|/[a-z]/users/[^/]+/appdata/local/temp/)"
   ],
 
-  "_writeDeny": "Governance files CVB may NEVER write, even if an allow rule would match. Changing personas or team rules needs the owner's go-ahead. basenames = exact filename; contains = substring (protects vault/team canon).",
+  "_notes": "THE NOTES RULE. Beyond the coordination paths above, CVB may write NOTE-SHAPED files (plans, task files, analyses, research, briefs, captured output) anywhere under the roots below. Anything whose extension is NOT in noteExtensions is a deliverable by definition, which is what keeps him out of code (.ts/.tsx/.js/.html/.css/.py), images and binaries. The carve-outs below stop the notes rule swallowing work that belongs to a teammate or to the owner.",
+  "noteExtensions": [
+    ".md", ".txt", ".csv", ".tsv", ".log", ".json", ".jsonl", ".yml", ".yaml"
+  ],
+  "noteAllowRoots": [
+    "{{PROJECTS_ROOT}}/",
+    "{{PROJECTS_ROOT_GITBASH}}/",
+    "{{CLAUDE_DIR}}/",
+    "{{CLAUDE_DIR_GITBASH}}/"
+  ],
+
+  "_noteDenyContains": "Carve-out 1: directories where a note extension IS the deliverable. Markdown under a content/blog tree is Casey's article body, not a note. Anything under src/ is production, whatever its extension (a .json fixture or a .yml workflow is Devin's).",
+  "noteDenyContains": [
+    "/content/", "/blog/", "/posts/", "/_posts/", "/articles/", "/drafts/",
+    "/src/", "/node_modules/", "/.git/", "/.github/", "/dist/", "/build/"
+  ],
+
+  "_noteDenyBasenames": "Carve-out 2: config files that happen to wear a note extension. Writing package.json or firestore.rules is a production change, not note-taking.",
+  "noteDenyBasenames": [
+    "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+    "tsconfig.json", "jsconfig.json", "next.config.json", "firebase.json",
+    ".firebaserc", "firestore.rules", "storage.rules", "firestore.indexes.json",
+    "manifest.json", "vercel.json", "netlify.toml", "docker-compose.yml",
+    "settings.json", "settings.local.json", "ecosystem.config.js",
+    "cvb-guard.config.json", ".env", ".env.local", ".env.production"
+  ],
+
+  "_writeDeny": "Carve-out 3 and the hard floor: governance files CVB may NEVER write, even if an allow rule or the notes rule would match. Changing personas or team rules needs the owner's go-ahead. basenames = exact filename; contains = substring (protects vault/team canon).",
   "writeDenyBasenames": [
     "soul.md",
     "agents.md",
@@ -32,7 +63,7 @@
     "/vault/team/"
   ],
 
-  "_bashDeny": "Bash is default-ALLOW. Ordinary git writes (add/commit/merge/checkout/plain push), builds, pm2, and deploy scripts are ALLOWED — CVB runs commits and deployments for reviewed work. Still DENIED: git history surgery (rebase/reset/clean/cherry-pick/am/apply), force or delete pushes, amended commits, package publishing, image-gen python, and raw file mutation (rm/mv/cp). firstToken = the executable name of any command segment; regex = matched against each quote-stripped segment (case-insensitive).",
+  "_bashDeny": "Bash is default-ALLOW. Ordinary git writes (add/commit/merge/checkout/plain push), builds, pm2, and deploy scripts are ALLOWED; CVB runs commits and deployments for reviewed work. Still DENIED: git history surgery (rebase/reset/clean/cherry-pick/am/apply), force or delete pushes, amended commits, package publishing, image-gen python, and raw file mutation (rm/mv/cp). firstToken = the executable name of any command segment; regex = matched against each quote-stripped segment (case-insensitive).",
   "bashDenyFirstToken": [
     "rm", "del", "erase", "rmdir", "rd", "move", "mv", "cp", "copy", "robocopy", "xcopy",
     "python", "python3", "py"

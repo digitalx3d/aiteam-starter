@@ -171,7 +171,8 @@ function TypingBubble({ m }: { m: RosterMember }) {
 }
 
 const MODELS = [
-  { value: "opus", label: "Opus (deepest, default)" },
+  { value: "opus", label: "Opus (most capable, default)" },
+  { value: "fable", label: "Fable (deepest, priciest)" },
   { value: "sonnet", label: "Sonnet (faster, cheaper)" },
   { value: "haiku", label: "Haiku (quick / trivial)" },
 ];
@@ -219,6 +220,7 @@ const OUTSIDER_PRESETS: OutsiderRow[] = [
 const AGENT_MODELS = [
   { value: "", label: "Room default" },
   { value: "opus", label: "Opus" },
+  { value: "fable", label: "Fable" },
   { value: "sonnet", label: "Sonnet" },
   { value: "haiku", label: "Haiku" },
 ];
@@ -334,7 +336,7 @@ export function WarRoom() {
         };
         if (cancelled || !Array.isArray(data.agents)) return;
         const ws = data.agents
-          .filter((a) => !a.role) // workers have no static role (john/claude do)
+          .filter((a) => !a.role) // workers have no static role (owner/claude do)
           .map((a) => ({
             name: a.name,
             displayName: a.fullName || a.displayName,

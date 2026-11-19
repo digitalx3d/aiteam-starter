@@ -11,6 +11,8 @@ import {
   Swords,
   Inbox,
   Settings,
+  ListChecks,
+  Server,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -18,6 +20,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { InboxUnreadBadge } from "./inbox-unread-badge";
+import { ActionItemsBadge } from "./action-items-badge";
+import { ServersDownBadge } from "./servers-down-badge";
 
 interface NavItem {
   href: string;
@@ -30,6 +34,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "The Bridge", Icon: LayoutDashboard },
+  {
+    href: "/action-items",
+    label: "Action Items",
+    Icon: ListChecks,
+    TrailingSlot: ({ collapsed }) => <ActionItemsBadge compact={collapsed} />,
+  },
   { href: "/projects", label: "Projects", Icon: FolderKanban },
   { href: "/team", label: "Team", Icon: Users },
   { href: "/war-room", label: "War Room", Icon: Swords },
@@ -39,6 +49,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Inbox",
     Icon: Inbox,
     TrailingSlot: ({ collapsed }) => <InboxUnreadBadge compact={collapsed} />,
+  },
+  {
+    href: "/servers",
+    label: "Servers",
+    Icon: Server,
+    TrailingSlot: ({ collapsed }) => <ServersDownBadge compact={collapsed} />,
   },
   { href: "/settings", label: "Settings", Icon: Settings },
 ];
@@ -111,13 +127,14 @@ export function NavSidebar() {
   return (
     <>
       {/* ---- Hamburger trigger (mobile only) ---- */}
-      {/* Hamburger trigger (mobile only). h-9 inside the 48px top bar, centered
-          vertically (top-1.5 = 6px top/bottom margin) so it doesn't cross the bar. */}
+      {/* Hamburger trigger (mobile only). h-10 inside the 48px top bar, centered
+          vertically (4px top/bottom margin) so it doesn't cross the bar, and
+          dropped by the status-bar inset like the bar itself (app-chrome.tsx). */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation"
-        className="fixed top-1.5 left-3 z-40 h-9 w-9 flex items-center justify-center rounded-md bg-muted-bg border border-border text-muted hover:text-foreground md:hidden"
+        className="fixed top-[calc(env(safe-area-inset-top)+0.25rem)] left-[calc(env(safe-area-inset-left)+0.75rem)] z-40 h-10 w-10 flex items-center justify-center rounded-md bg-muted-bg border border-border text-muted hover:text-foreground md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -134,7 +151,7 @@ export function NavSidebar() {
       {/* ---- Mobile drawer sheet ---- */}
       <div
         className={
-          "fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-muted-bg border-r border-border shadow-xl transition-transform duration-200 md:hidden " +
+          "fixed inset-y-0 left-0 z-50 w-64 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] bg-muted-bg border-r border-border shadow-xl transition-transform duration-200 md:hidden " +
           (mobileOpen ? "translate-x-0" : "-translate-x-full")
         }
         role="dialog"
@@ -147,7 +164,7 @@ export function NavSidebar() {
             type="button"
             onClick={closeMobile}
             aria-label="Close navigation"
-            className="p-1.5 rounded text-muted hover:text-foreground hover:bg-background/40"
+            className="-mr-2 p-3 rounded text-muted hover:text-foreground hover:bg-background/40"
           >
             <X className="h-4 w-4" />
           </button>

@@ -32,6 +32,15 @@ interface NarrationEvent {
   kind: Kind;
   text: string;
   project?: string;
+  /** Dispatch ticket id. Parallel workers of the same agent have different slots. */
+  slot?: string;
+  /** The slot's label (its brief's title), so the owner can tell parallel slots apart. */
+  label?: string;
+}
+
+/** One row per agent, or per agent and slot when the post came from a dispatch. */
+function slotKey(evt: NarrationEvent): string {
+  return evt.slot ? `${evt.agent}/${evt.slot}` : evt.agent;
 }
 
 interface AgentMeta {
@@ -102,7 +111,7 @@ export function LiveFeed() {
   const [agents, setAgents] = useState<Record<string, AgentMeta>>({});
   const [connected, setConnected] = useState(false);
   const [open, setOpen] = useState(true);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [filterOpen, setFilterOpen] = useState(false);
   const [agentFilter, setAgentFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -155,8 +164,8 @@ export function LiveFeed() {
           if (data?.type !== "narration") return;
           const evt = data as NarrationEvent;
           setEvents((prev) => {
-            const key = `${evt.ts}-${evt.agent}-${evt.text}`;
-            if (prev.some((e) => `${e.ts}-${e.agent}-${e.text}` === key)) return prev;
+            const key = `${evt.ts}-${slotKey(evt)}-${evt.text}`;
+            if (prev.some((e) => `${e.ts}-${slotKey(e)}-${e.text}` === key)) return prev;
             const next = [...prev, evt].sort((a, b) => b.ts - a.ts);
             return next.slice(0, MAX_EVENTS);
           });
@@ -204,12 +213,14 @@ export function LiveFeed() {
     );
   }, [events, agentFilter, projectFilter, filterActive]);
 
-  // Compute "currently working" — latest event per agent that is fresh.
+  // Compute "currently working": the latest fresh event per agent, or per agent
+  // and slot for dispatched work, so three parallel Indys show as three rows.
   const nowSection = useMemo(() => {
     const latest = new Map<string, NarrationEvent>();
     for (const evt of filteredEvents) {
-      const prior = latest.get(evt.agent);
-      if (!prior || evt.ts > prior.ts) latest.set(evt.agent, evt);
+      const key = slotKey(evt);
+      const prior = latest.get(key);
+      if (!prior || evt.ts > prior.ts) latest.set(key, evt);
     }
     const fresh: NarrationEvent[] = [];
     for (const evt of latest.values()) {
@@ -320,7 +331,7 @@ export function LiveFeed() {
             Working now
           </div>
           {nowSection.map((evt) => (
-            <NowRow key={evt.agent} evt={evt} now={now} agentMeta={agents[evt.agent]} />
+            <NowRow key={slotKey(evt)} evt={evt} now={now} agentMeta={agents[evt.agent]} />
           ))}
         </div>
       )}
@@ -342,7 +353,7 @@ export function LiveFeed() {
             </div>
             {filteredEvents.map((evt, i) => (
               <FeedRow
-                key={`${evt.ts}-${evt.agent}-${i}`}
+                key={`${evt.ts}-${slotKey(evt)}-${i}`}
                 evt={evt}
                 now={now}
                 agentMeta={agents[evt.agent]}
@@ -388,6 +399,11 @@ function NowRow({
             {timeAgo(evt.ts, now)}
           </span>
         </div>
+        {evt.label && (
+          <div className="text-[10px] text-muted truncate" title={evt.label}>
+            {evt.label}
+          </div>
+        )}
         <div className="text-xs text-foreground/85 leading-snug mt-0.5 whitespace-pre-line">
           {evt.project && (
             <span className="font-semibold text-foreground">{evt.project}: </span>
@@ -431,6 +447,11 @@ function FeedRow({
             {timeAgo(evt.ts, now)}
           </span>
         </div>
+        {evt.label && (
+          <div className="text-[10px] text-muted truncate" title={evt.label}>
+            {evt.label}
+          </div>
+        )}
         <div className="text-[11px] text-foreground/75 leading-snug whitespace-pre-line">
           {evt.project && (
             <span className="font-semibold text-foreground/90">{evt.project}: </span>

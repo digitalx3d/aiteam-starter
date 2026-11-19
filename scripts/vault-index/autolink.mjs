@@ -28,7 +28,7 @@ const SKIP_TYPES = new Set(["transcript", "rolling-summary", "vault-root"]);
 const SKIP_PATH_PREFIXES = ["transcripts/", "agents/claude/summaries/"];
 const MAX_FILE_BYTES = 300 * 1024;
 
-// Agent first names safe to detect in prose. "claude" and "john" appear in
+// Agent first names safe to detect in prose. "claude" and "owner" appear in
 // nearly every note, so they are only tagged when named in frontmatter.
 const BODY_SCAN_AGENTS = ["maya", "devin", "casey", "ethan", "indy"];
 
@@ -93,7 +93,7 @@ export function computeMatches(note, body, candidates) {
   const fmAgents = new Set(
     [...(note.agents || []), note.extra?.from].filter(Boolean).map((a) => String(a).toLowerCase())
   );
-  fmAgents.delete("john"); // The owner is the human, not an agent persona
+  fmAgents.delete("owner"); // The owner is the human, not an agent persona
   for (const a of fmAgents) tags.add(`agent/${a}`);
   for (const a of BODY_SCAN_AGENTS) {
     if (wordMatch(searchable, a)) tags.add(`agent/${a}`);

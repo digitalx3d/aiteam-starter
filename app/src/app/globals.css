@@ -63,6 +63,58 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Touch devices: <VisualViewportSync> writes the height of the part of the
+   screen the on-screen keyboard is NOT covering into --vvh. iOS never resizes
+   the page for its keyboard (dvh included), so without this the message box
+   sits under the keyboard or the whole app gets panned off the top. Unset on
+   desktop, where the dvh rule above stands. */
+html.vv-sync,
+html.vv-sync body {
+  height: var(--vvh, 100dvh);
+}
+
+/* Phone layout rules. Everything below is scoped under 768px (Tailwind's md
+   breakpoint, where the sidebar appears) so the desktop render is untouched. */
+@media (max-width: 767px) {
+  /* The installed iPhone app runs edge to edge (viewport-fit=cover with the
+     black-translucent status bar), so keep content clear of the notch, the
+     rounded corners in landscape, and the home indicator. The top inset is
+     applied by the mobile top bar itself, which owns that strip. */
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* iOS zooms the whole page when a focused text field's font is under 16px,
+     and does not zoom back out. Unlayered, so it beats the text-xs / text-sm
+     utilities without touching any of them. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  /* The 16px text needs a little more height than the h-7 desktop pickers,
+     and it gives them a fingertip-sized target. */
+  select {
+    min-height: 2.25rem;
+  }
+
+  /* Chat and markdown text: break long unbroken runs (Windows paths, commands
+     in inline code, bare URLs) instead of pushing the conversation sideways.
+     Code blocks keep white-space: pre and scroll inside themselves. Tables go
+     back to word-level breaking so their columns don't collapse to one letter;
+     a wide table scrolls inside its own wrapper. */
+  .chat-prose,
+  .markdown-body {
+    overflow-wrap: anywhere;
+  }
+  .chat-prose table,
+  .markdown-body table {
+    overflow-wrap: break-word;
+  }
+}
+
 /* Subtle scrollbar, themed. */
 ::-webkit-scrollbar {
   width: 10px;

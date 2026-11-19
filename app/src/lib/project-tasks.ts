@@ -1,11 +1,14 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { assigneeLookup, canonicalAssignee } from "./tasks";
 
 export type TaskStatus = "todo" | "in-progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high";
 
 export interface ProjectTask {
   id: string;
+  /** Per-project sequence number (#0042), or null for pre-numbering tasks. */
+  num: number | null;
   title: string;
   assignee: string | null;
   status: TaskStatus;
@@ -49,36 +52,55 @@ function toMs(s: string | undefined, fallback: number): number {
   return Number.isFinite(t) ? t : fallback;
 }
 
+/**
+ * Parsed task files, reused until the file's modified time or size changes.
+ *
+ * The Projects page and The Bridge both list every board, ~3,000 files. Inside
+ * the pm2-run dashboard each file read costs several times what it does from a
+ * console, and reading them all one at a time per request made /projects take
+ * ~2s (measured 2026-10-16). Now a request costs one stat per file, run in
+ * parallel, and only changed files are read.
+ */
+const taskCache = new Map<string, { mtimeMs: number; size: number; task: ProjectTask }>();
+
 async function readOneTask(filePath: string): Promise<ProjectTask | null> {
   try {
-    const [text, st] = await Promise.all([
-      readFile(filePath, "utf8"),
-      stat(filePath),
-    ]);
-    const { meta, body } = parseFrontmatter(text);
-    const id = meta.id || path.basename(filePath, ".md");
-    const title = meta.title || path.basename(filePath, ".md");
-    const status: TaskStatus = VALID_STATUSES.has(meta.status as TaskStatus)
-      ? (meta.status as TaskStatus)
-      : "todo";
-    const priority: TaskPriority = VALID_PRIORITIES.has(meta.priority as TaskPriority)
-      ? (meta.priority as TaskPriority)
-      : "medium";
-    return {
-      id,
-      title,
-      assignee: meta.assignee || null,
-      status,
-      priority,
-      due: meta.due || null,
-      createdMs: toMs(meta.created, st.mtimeMs),
-      updatedMs: toMs(meta.updated, st.mtimeMs),
-      description: body.trim(),
-      path: filePath,
-    };
+    const st = await stat(filePath);
+    const hit = taskCache.get(filePath);
+    if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.task;
+    const task = parseTask(filePath, await readFile(filePath, "utf8"), st.mtimeMs);
+    taskCache.set(filePath, { mtimeMs: st.mtimeMs, size: st.size, task });
+    return task;
   } catch {
+    taskCache.delete(filePath);
     return null;
   }
+}
+
+function parseTask(filePath: string, text: string, mtimeMs: number): ProjectTask {
+  const { meta, body } = parseFrontmatter(text);
+  const id = meta.id || path.basename(filePath, ".md");
+  const title = meta.title || path.basename(filePath, ".md");
+  const status: TaskStatus = VALID_STATUSES.has(meta.status as TaskStatus)
+    ? (meta.status as TaskStatus)
+    : "todo";
+  const priority: TaskPriority = VALID_PRIORITIES.has(meta.priority as TaskPriority)
+    ? (meta.priority as TaskPriority)
+    : "medium";
+  const parsedNum = Number.parseInt(meta.num ?? "", 10);
+  return {
+    id,
+    num: Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : null,
+    title,
+    assignee: meta.assignee || null,
+    status,
+    priority,
+    due: meta.due || null,
+    createdMs: toMs(meta.created, mtimeMs),
+    updatedMs: toMs(meta.updated, mtimeMs),
+    description: body.trim(),
+    path: filePath,
+  };
 }
 
 /** List all task files in a project's .aiteam/tasks directory. */
@@ -90,13 +112,17 @@ export async function listProjectTasks(projectRoot: string): Promise<ProjectTask
   } catch {
     return [];
   }
-  const tasks: ProjectTask[] = [];
-  for (const n of names) {
-    if (!n.toLowerCase().endsWith(".md")) continue;
-    const t = await readOneTask(path.join(dir, n));
-    if (t) tasks.push(t);
-  }
-  return tasks;
+  const lookup = await assigneeLookup();
+  const read = await Promise.all(
+    names
+      .filter((n) => n.toLowerCase().endsWith(".md"))
+      .map((n) => readOneTask(path.join(dir, n)))
+  );
+  // Copies, so a caller editing a task can't change what the cache holds.
+  // Agents write "devin"; the team roster says "Devin".
+  return read
+    .filter((t): t is ProjectTask => t !== null)
+    .map((t) => ({ ...t, assignee: canonicalAssignee(t.assignee, lookup) }));
 }
 
 /**

@@ -36,7 +36,7 @@ export function HideProjectButton({ name }: { name: string }) {
       onClick={hide}
       title={`Hide ${name}`}
       aria-label={`Hide ${name}`}
-      className="shrink-0 w-10 flex items-center justify-center text-muted hover:text-error transition-all opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+      className="shrink-0 w-11 sm:w-10 flex items-center justify-center text-muted hover:text-error transition-all opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
     >
       {busy ? (
         <Loader2 className="h-4 w-4 animate-spin" />

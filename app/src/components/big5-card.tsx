@@ -65,31 +65,48 @@ export function Big5Card() {
   const [draft, setDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Version of big5.md this card is holding. Sent back on every write so a
+  // stale tab can't overwrite an edit made elsewhere (see lib/big5.ts).
+  const revisionRef = useRef<string | undefined>(undefined);
+  const [staleNotice, setStaleNotice] = useState(false);
 
-  // Initial fetch.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/big5", { cache: "no-store" });
+      if (!res.ok) return false;
+      const data = (await res.json()) as {
+        active: Big5Item[];
+        completed: CompletedItem[];
+        revision?: string;
+      };
+      setItems(padToSlots(data.active ?? []));
+      setCompleted(data.completed ?? []);
+      revisionRef.current = data.revision;
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Initial fetch, then again whenever the tab regains focus. The file is also
+  // edited from the terminal and by agents, and a card left open for hours
+  // would otherwise show (and save) a stale list.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/big5");
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          active: Big5Item[];
-          completed: CompletedItem[];
-        };
-        if (cancelled) return;
-        setItems(padToSlots(data.active ?? []));
-        setCompleted(data.completed ?? []);
-      } catch {
-        /* ignore */
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    const run = async () => {
+      await load();
+      if (!cancelled) setLoading(false);
+    };
+    void run();
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener("focus", onFocus);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (editingIndex !== null) {
@@ -100,11 +117,33 @@ export function Big5Card() {
   const persist = useCallback(
     async (active: Big5Item[], completedNext: CompletedItem[]) => {
       try {
-        await fetch("/api/big5", {
+        const res = await fetch("/api/big5", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active, completed: completedNext }),
+          body: JSON.stringify({
+            active,
+            completed: completedNext,
+            revision: revisionRef.current,
+          }),
         });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          conflict?: boolean;
+          active?: Big5Item[];
+          completed?: CompletedItem[];
+          revision?: string;
+        };
+        if (res.status === 409 && data.conflict) {
+          // The file changed under us. Show what it actually says and say so,
+          // rather than quietly winning and losing the other edit.
+          setItems(padToSlots(data.active ?? []));
+          setCompleted(data.completed ?? []);
+          revisionRef.current = data.revision;
+          setStaleNotice(true);
+          return;
+        }
+        if (data.revision) revisionRef.current = data.revision;
+        setStaleNotice(false);
       } catch {
         /* best effort */
       }
@@ -190,6 +229,12 @@ export function Big5Card() {
         }
       />
       <div className="rounded-lg border border-border bg-card-bg p-4 shadow-lg shadow-black/30">
+        {staleNotice && (
+          <div className="mb-3 rounded-md border border-accent-2/40 bg-accent-2/10 px-3 py-2 text-xs text-foreground">
+            This list changed somewhere else, so your last edit was not saved.
+            What you see now is what the file says. Make the change again.
+          </div>
+        )}
         <ul className="space-y-1">
           {items.map((item, i) => {
             const isEditing = editingIndex === i;
@@ -204,7 +249,7 @@ export function Big5Card() {
                   onClick={() => !isEmpty && toggleDone(i)}
                   disabled={isEmpty}
                   className={
-                    "mt-0.5 shrink-0 transition-colors " +
+                    "mt-0.5 shrink-0 transition-colors max-md:p-3 max-md:-mx-3 max-md:-mb-3 max-md:-mt-2.5 " +
                     (isEmpty
                       ? "text-muted/30 cursor-default"
                       : item.done
@@ -255,7 +300,7 @@ export function Big5Card() {
                         ? "Clear (archives to history)"
                         : "Clear (discard)"
                     }
-                    className="opacity-0 group-hover:opacity-100 shrink-0 mt-1 p-0.5 rounded text-muted hover:text-error hover:bg-background/40 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0 mt-1 p-0.5 max-md:p-2.5 max-md:-m-2 rounded text-muted hover:text-error hover:bg-background/40 transition-opacity"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

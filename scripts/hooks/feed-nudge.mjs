@@ -13,8 +13,14 @@
  * reminders so an agent that is mid-way through honoring one isn't spammed on
  * every subsequent tool call.
  *
+ * With --ticket (every dispatched worker gets one), silence is measured against
+ * that dispatch's own post file, posts/<ticket>.md, which feed-post.mjs updates
+ * on each accepted post. Parallel workers share now.md, so its timestamp says
+ * "some slot posted", not "this one did". The cooldown marker is per ticket too.
+ * Without --ticket it measures now.md, as it always has.
+ *
  * Invocation: node feed-nudge.mjs --agent <name> --project <label> --agents-dir <path>
- *             [--threshold-min 7] [--cooldown-min 3]
+ *             [--ticket <id>] [--threshold-min 7] [--cooldown-min 3]
  *
  * Fail-open: any error => exit 0 with no output; a broken nudge never breaks a run.
  */
@@ -71,13 +77,18 @@ try {
   const cooldownMs =
     (Number.isFinite(Number(flags["cooldown-min"])) ? Number(flags["cooldown-min"]) : 3) * 60_000;
 
+  const ticket =
+    typeof flags.ticket === "string" && /^[A-Za-z0-9_-]+$/.test(flags.ticket) ? flags.ticket : null;
   const nowMd = path.join(agentsDir, agent, "now.md");
-  const marker = path.join(agentsDir, agent, ".feed-nudge");
+  const postFile = ticket ? path.join(agentsDir, agent, "posts", `${ticket}.md`) : nowMd;
+  const marker = ticket
+    ? path.join(agentsDir, agent, "posts", `${ticket}.nudge`)
+    : path.join(agentsDir, agent, ".feed-nudge");
   const now = Date.now();
 
   let lastPost = 0;
   try {
-    lastPost = fs.statSync(nowMd).mtimeMs;
+    lastPost = fs.statSync(postFile).mtimeMs;
   } catch {
     /* no post yet — treat as overdue */
   }

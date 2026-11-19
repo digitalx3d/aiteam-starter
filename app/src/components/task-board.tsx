@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   Plus,
   Trash2,
   Calendar,
   ChevronDown,
   ChevronRight,
+  Search,
   X,
 } from "lucide-react";
 
@@ -15,6 +22,7 @@ export type TaskPriority = "low" | "medium" | "high";
 
 export interface Task {
   id: string;
+  num: number | null;
   title: string;
   description: string;
   assignee: string | null;
@@ -23,6 +31,7 @@ export interface Task {
   due: string | null;
   created: string;
   updated: string;
+  completed: string | null;
 }
 
 interface TaskBoardProps {
@@ -51,6 +60,120 @@ const PRIORITY_STYLES: Record<TaskPriority, string> = {
   medium: "border-accent/40 text-accent",
   high: "border-accent-2/60 bg-accent-2/10 text-accent-2",
 };
+
+type SortKey = "priority" | "newest" | "oldest" | "number" | "agent";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  priority: "Priority",
+  newest: "Newest first",
+  oldest: "Oldest first",
+  number: "Task number",
+  agent: "Agent",
+};
+
+const SORT_ORDER: SortKey[] = ["priority", "newest", "oldest", "number", "agent"];
+const SORT_STORAGE_KEY = "aiteam.tasks.sort";
+
+const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
+
+/** How many rows a section shows before the "Show all" button. */
+const SECTION_LIMITS: Record<TaskStatus, number> = {
+  todo: 25,
+  "in-progress": 25,
+  blocked: 25,
+  done: 10,
+};
+
+/** #0042. Four digits, and it just grows past 9999. */
+function formatTaskNumber(num: number): string {
+  return `#${String(num).padStart(4, "0")}`;
+}
+
+/**
+ * The date a task is sorted by: when it was finished if it's done,
+ * otherwise when it was created. Sorting happens inside a status section,
+ * so the two never mix in one list.
+ */
+function sortDate(task: Task): string {
+  if (task.status === "done") return task.completed || task.updated || task.created;
+  return task.created;
+}
+
+function sortTasks(list: Task[], key: SortKey): Task[] {
+  const arr = [...list];
+  switch (key) {
+    case "newest":
+      arr.sort((a, b) => sortDate(b).localeCompare(sortDate(a)));
+      break;
+    case "oldest":
+      arr.sort((a, b) => sortDate(a).localeCompare(sortDate(b)));
+      break;
+    case "number":
+      // Highest number first; unnumbered legacy tasks fall to the bottom.
+      arr.sort((a, b) => {
+        if (a.num !== null && b.num !== null) return b.num - a.num;
+        if (a.num !== null) return -1;
+        if (b.num !== null) return 1;
+        return sortDate(b).localeCompare(sortDate(a));
+      });
+      break;
+    case "agent":
+      arr.sort((a, b) => {
+        // Unassigned sorts last.
+        const an = a.assignee ?? "￿";
+        const bn = b.assignee ?? "￿";
+        const c = an.localeCompare(bn);
+        if (c !== 0) return c;
+        return sortDate(b).localeCompare(sortDate(a));
+      });
+      break;
+    default:
+      arr.sort((a, b) => {
+        const p = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+        if (p !== 0) return p;
+        if (a.due && b.due && a.due !== b.due) return a.due < b.due ? -1 : 1;
+        if (a.due && !b.due) return -1;
+        if (!a.due && b.due) return 1;
+        return sortDate(b).localeCompare(sortDate(a));
+      });
+      break;
+  }
+  return arr;
+}
+
+/** Matches on number (42, 0042, #0042), title, description, or agent. */
+function matchesQuery(task: Task, rawQuery: string): boolean {
+  const q = rawQuery.trim().toLowerCase().replace(/^#/, "");
+  if (!q) return true;
+  if (task.num !== null && formatTaskNumber(task.num).slice(1).includes(q)) {
+    return true;
+  }
+  return (
+    task.title.toLowerCase().includes(q) ||
+    task.description.toLowerCase().includes(q) ||
+    (task.assignee ?? "").toLowerCase().includes(q)
+  );
+}
+
+/**
+ * "2026-08-06 11:32 PM" in the viewer's own timezone. The stored stamps are
+ * UTC, so the date has to come from the local parts too, otherwise a task
+ * created late in the evening reads as the next day.
+ */
+function formatStamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const date = [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${date} ${time}`;
+}
 
 function formatRelativeDue(due: string | null): {
   label: string;
@@ -81,10 +204,37 @@ export function TaskBoard({
 }: TaskBoardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("priority");
+  const [showAll, setShowAll] = useState<Set<TaskStatus>>(new Set());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Remember the sort choice between visits. localStorage only exists in the
+  // browser, so this can't be a useState initializer without desyncing from
+  // the server render.
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = window.localStorage.getItem(SORT_STORAGE_KEY);
+    } catch {
+      /* private mode */
+    }
+    if (!saved || !(SORT_ORDER as string[]).includes(saved)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration of a persisted UI preference
+    setSortKey(saved as SortKey);
+  }, []);
+
+  const changeSort = useCallback((key: SortKey) => {
+    setSortKey(key);
+    try {
+      window.localStorage.setItem(SORT_STORAGE_KEY, key);
+    } catch {
+      /* private mode, not worth surfacing */
+    }
+  }, []);
 
   const toggleExpand = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -95,12 +245,36 @@ export function TaskBoard({
     });
   }, []);
 
+  const toggleShowAll = useCallback((status: TaskStatus) => {
+    setShowAll((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }, []);
+
+  const searching = query.trim().length > 0;
+
+  // Any assignee that appears on a task but isn't on the current roster still
+  // needs to be filterable.
+  const filterOptions = useMemo(() => {
+    const extra = new Set<string>();
+    for (const t of tasks) {
+      if (t.assignee && !assigneeOptions.includes(t.assignee)) extra.add(t.assignee);
+    }
+    if (extra.size === 0) return assigneeOptions;
+    return [...assigneeOptions, ...[...extra].sort((a, b) => a.localeCompare(b))];
+  }, [tasks, assigneeOptions]);
+
   const filtered = useMemo(() => {
-    if (filterAssignee === "all") return tasks;
-    if (filterAssignee === "__unassigned__")
-      return tasks.filter((t) => !t.assignee);
-    return tasks.filter((t) => t.assignee === filterAssignee);
-  }, [tasks, filterAssignee]);
+    let out = tasks;
+    if (filterAssignee === "__unassigned__") out = out.filter((t) => !t.assignee);
+    else if (filterAssignee !== "all")
+      out = out.filter((t) => t.assignee === filterAssignee);
+    if (searching) out = out.filter((t) => matchesQuery(t, query));
+    return out;
+  }, [tasks, filterAssignee, query, searching]);
 
   const grouped = useMemo(() => {
     const out: Record<TaskStatus, Task[]> = {
@@ -110,8 +284,11 @@ export function TaskBoard({
       done: [],
     };
     for (const t of filtered) out[t.status].push(t);
+    for (const status of STATUS_ORDER) {
+      out[status] = sortTasks(out[status], sortKey);
+    }
     return out;
-  }, [filtered]);
+  }, [filtered, sortKey]);
 
   const apiBase = `/api/projects/${encodeURIComponent(slug)}/tasks`;
 
@@ -190,8 +367,39 @@ export function TaskBoard({
 
   return (
     <div className="px-4 sm:px-6 py-4 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <div className="flex items-center gap-2 text-sm">
+      <div className="mb-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tasks by number, title, or text..."
+              className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-8 text-xs focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+            {searching && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNew((v) => !v)}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 max-md:min-h-10 text-xs font-medium text-accent-fg hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>New task</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <label className="text-xs text-muted">Assignee:</label>
           <select
             value={filterAssignee}
@@ -200,24 +408,32 @@ export function TaskBoard({
           >
             <option value="all">Everyone</option>
             <option value="__unassigned__">Unassigned</option>
-            {assigneeOptions.map((a) => (
+            {filterOptions.map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
             ))}
           </select>
-          <span className="text-xs text-muted ml-2">
-            {filtered.length} {filtered.length === 1 ? "task" : "tasks"}
+
+          <label className="text-xs text-muted ml-1">Sort:</label>
+          <select
+            value={sortKey}
+            onChange={(e) => changeSort(e.target.value as SortKey)}
+            className="h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            {SORT_ORDER.map((k) => (
+              <option key={k} value={k}>
+                {SORT_LABELS[k]}
+              </option>
+            ))}
+          </select>
+
+          <span className="text-xs text-muted ml-1">
+            {searching
+              ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"}`
+              : `${filtered.length} ${filtered.length === 1 ? "task" : "tasks"}`}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNew((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:opacity-90"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>New task</span>
-        </button>
       </div>
 
       {error && (
@@ -245,6 +461,15 @@ export function TaskBoard({
       <div className="space-y-5">
         {STATUS_ORDER.map((status) => {
           const items = grouped[status];
+          // A search is a hunt for one task, so never hide matches behind
+          // a "show all" button.
+          const expandedSection = searching || showAll.has(status);
+          const limit = SECTION_LIMITS[status];
+          const visible = expandedSection ? items : items.slice(0, limit);
+          const hidden = items.length - visible.length;
+
+          if (searching && items.length === 0) return null;
+
           return (
             <section key={status}>
               <div className="text-xs uppercase tracking-wide text-muted mb-1.5 font-medium">
@@ -256,23 +481,42 @@ export function TaskBoard({
                   No tasks.
                 </div>
               ) : (
-                <ul className="space-y-1.5">
-                  {items.map((t) => (
-                    <TaskRow
-                      key={t.id}
-                      task={t}
-                      assigneeOptions={assigneeOptions}
-                      expanded={expanded.has(t.id)}
-                      onToggleExpand={() => toggleExpand(t.id)}
-                      onUpdate={(patch) => updateTask(t.id, patch)}
-                      onDelete={() => deleteTask(t.id)}
-                    />
-                  ))}
-                </ul>
+                <>
+                  <ul className="space-y-1.5">
+                    {visible.map((t) => (
+                      <TaskRow
+                        key={t.id}
+                        task={t}
+                        assigneeOptions={assigneeOptions}
+                        expanded={expanded.has(t.id)}
+                        onToggleExpand={() => toggleExpand(t.id)}
+                        onUpdate={(patch) => updateTask(t.id, patch)}
+                        onDelete={() => deleteTask(t.id)}
+                      />
+                    ))}
+                  </ul>
+                  {!searching && (hidden > 0 || showAll.has(status)) && (
+                    <button
+                      type="button"
+                      onClick={() => toggleShowAll(status)}
+                      className="mt-1.5 w-full rounded-md border border-dashed border-border py-1.5 text-[11px] text-muted hover:border-foreground/30 hover:text-foreground"
+                    >
+                      {hidden > 0
+                        ? `Show all ${items.length}`
+                        : `Show fewer (${limit} of ${items.length})`}
+                    </button>
+                  )}
+                </>
               )}
             </section>
           );
         })}
+
+        {searching && filtered.length === 0 && (
+          <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted">
+            No tasks match &ldquo;{query.trim()}&rdquo;.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -413,6 +657,13 @@ function TaskRow({
   const [descDraft, setDescDraft] = useState(task.description);
   const dueInfo = formatRelativeDue(task.due);
   const isDone = task.status === "done";
+  // A name that isn't on the roster (a former teammate, a typo) still has to
+  // appear in the dropdown, or the select silently falls back to "Unassigned"
+  // while the row badge shows the name.
+  const options =
+    task.assignee && !assigneeOptions.includes(task.assignee)
+      ? [task.assignee, ...assigneeOptions]
+      : assigneeOptions;
 
   function commitTitle() {
     setEditingTitle(false);
@@ -428,11 +679,13 @@ function TaskRow({
 
   return (
     <li className="rounded-md border border-border bg-cards-bg">
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
+      {/* Phones stack the title above its badges; from sm up it's one row. */}
+      <div className="flex flex-col gap-1.5 px-2.5 py-1.5 sm:flex-row sm:items-center sm:gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
         <button
           type="button"
           onClick={onToggleExpand}
-          className="text-muted hover:text-foreground p-0.5"
+          className="text-muted hover:text-foreground p-0.5 max-md:p-2.5 max-md:-m-2"
           title={expanded ? "Collapse" : "Expand"}
         >
           {expanded ? (
@@ -441,6 +694,20 @@ function TaskRow({
             <ChevronRight className="h-3.5 w-3.5" />
           )}
         </button>
+
+        <span
+          className={`shrink-0 w-11 font-mono text-[11px] tabular-nums ${
+            task.num === null ? "text-muted/40" : "text-muted"
+          }`}
+          title={
+            task.num === null
+              ? "Created before task numbering"
+              : `Task ${formatTaskNumber(task.num)}`
+          }
+        >
+          {task.num === null ? "—" : formatTaskNumber(task.num)}
+        </span>
+
         {editingTitle ? (
           <input
             autoFocus
@@ -463,7 +730,7 @@ function TaskRow({
               setTitleDraft(task.title);
               setEditingTitle(true);
             }}
-            className={`flex-1 text-left text-sm hover:text-foreground/90 truncate ${
+            className={`flex-1 min-w-0 text-left text-sm hover:text-foreground/90 max-sm:line-clamp-2 sm:truncate ${
               isDone ? "line-through text-muted" : ""
             }`}
             title="Click to rename"
@@ -471,7 +738,9 @@ function TaskRow({
             {task.title}
           </button>
         )}
+        </div>
 
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-7 sm:pl-0">
         <span
           className={`shrink-0 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_STYLES[task.priority]}`}
         >
@@ -519,11 +788,13 @@ function TaskRow({
           onClick={() => {
             if (confirm(`Delete "${task.title}"?`)) onDelete();
           }}
-          className="text-muted hover:text-error p-1"
+          className="ml-auto text-muted hover:text-error p-2.5 -m-1.5 sm:p-1 sm:m-0"
           title="Delete task"
+          aria-label="Delete task"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
+        </div>
       </div>
 
       {expanded && (
@@ -543,7 +814,7 @@ function TaskRow({
               className="h-7 rounded border border-border bg-background px-2 text-[11px]"
             >
               <option value="__none__">Unassigned</option>
-              {assigneeOptions.map((a) => (
+              {options.map((a) => (
                 <option key={a} value={a}>
                   {a}
                 </option>
@@ -607,9 +878,16 @@ function TaskRow({
             )}
           </div>
 
-          <div className="text-[10px] text-muted font-mono">
-            id: {task.id} · created {task.created.slice(0, 10)} · updated{" "}
-            {task.updated.slice(0, 10)}
+          {/* Times render in the viewer's timezone, which may differ from
+              the server's when the owner is travelling. */}
+          <div
+            className="text-[10px] text-muted font-mono"
+            suppressHydrationWarning
+          >
+            {task.num !== null && <>{formatTaskNumber(task.num)} · </>}
+            id: {task.id} · created {formatStamp(task.created)} · updated{" "}
+            {formatStamp(task.updated)}
+            {isDone && task.completed && <> · done {formatStamp(task.completed)}</>}
           </div>
         </div>
       )}

@@ -50,10 +50,13 @@ const archiveMarkdownComponents: Components = {
 export function ArchivedBlock({
   archive,
   recapText,
+  recapGaveUp,
   onDismiss,
 }: {
   archive: ArchivedTranscript;
   recapText: string | null;
+  /** True once the recap poll has timed out, so we stop claiming it's coming. */
+  recapGaveUp?: boolean;
   onDismiss: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -62,7 +65,7 @@ export function ArchivedBlock({
   const body = archive.markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
 
   return (
-    <div className="mx-3 sm:mx-6 my-2 rounded-md border border-border bg-background shadow-sm">
+    <div className="chat-prose mx-3 sm:mx-6 my-2 rounded-md border border-border bg-background shadow-sm">
       {/* Sticky so the collapse/dismiss controls stay reachable while you scroll
        *  down through the expanded content (or the newer messages below it) —
        *  you shouldn't have to scroll all the way back up just to close this. */}
@@ -74,7 +77,7 @@ export function ArchivedBlock({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-foreground/80"
+          className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-foreground/80 max-md:min-h-9 max-md:-my-2"
         >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5" />
@@ -97,7 +100,7 @@ export function ArchivedBlock({
               onDismiss();
             }
           }}
-          className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted hover:text-error"
+          className="ml-auto shrink-0 whitespace-nowrap inline-flex items-center gap-1 text-[11px] text-muted hover:text-error max-md:min-h-9 max-md:-my-2 max-md:px-2 max-md:-mr-2"
           title="Dismiss"
         >
           <X className="h-3 w-3" />
@@ -121,6 +124,11 @@ export function ArchivedBlock({
               {recapText}
             </ReactMarkdown>
           </>
+        ) : recapGaveUp ? (
+          <div className="text-xs text-muted italic">
+            The recap is taking longer than expected. The full conversation is archived above and
+            in the vault; reload this page in a minute to pick the recap up.
+          </div>
         ) : (
           <div className="text-xs text-muted italic">Generating a recap of where you left off...</div>
         )}

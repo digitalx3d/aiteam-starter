@@ -5,6 +5,8 @@ import { spawnClaude } from "./claude-spawn";
 import { buildCvbHookSettings } from "./cvb-hooks";
 import { readChatState } from "./chat-state";
 import { resolveProjectCwd } from "./projects";
+import { sessionLogPath } from "./session-log";
+import { markLogLive } from "./session-log-lock";
 import { subscribe as subscribeDispatch, type DispatchTicket } from "./dispatch-store";
 
 // VB Notifier — server-side subscriber to dispatch completions that auto-pokes
@@ -88,15 +90,25 @@ async function sendAutoNotify(
   // Resume VB's session on Haiku. No append-system-prompt — resume inherits.
   // Still carries the guard + clock hooks: this is CVB acting, so the same
   // deliverable/governance write-block applies during an auto-notify.
-  const { child, exitPromise } = spawnClaude({
-    cwd,
-    sessionId: state.sessionId,
-    resume: true,
-    message,
-    model: NOTIFY_MODEL,
-    permissionMode: "acceptEdits",
-    settings: buildCvbHookSettings(),
-  });
+  // Registered as a live turn so a move, delete or report post to this chat
+  // is refused while it runs instead of rewriting the log underneath it.
+  const releaseLive = await markLogLive(sessionLogPath(cwd, state.sessionId));
+  let spawned: ReturnType<typeof spawnClaude>;
+  try {
+    spawned = spawnClaude({
+      cwd,
+      sessionId: state.sessionId,
+      resume: true,
+      message,
+      model: NOTIFY_MODEL,
+      permissionMode: "acceptEdits",
+      settings: buildCvbHookSettings(),
+    });
+  } catch (err) {
+    releaseLive();
+    throw err;
+  }
+  const { child, exitPromise } = spawned;
 
   let buffer = "";
   let lastAssistantText: string | null = null;
@@ -112,7 +124,7 @@ async function sendAutoNotify(
     }
   });
 
-  const { code } = await exitPromise;
+  const { code } = await exitPromise.finally(releaseLive);
   if (buffer.trim()) {
     const text = extractAssistantText(buffer.trim());
     if (text) lastAssistantText = text;
@@ -128,6 +140,11 @@ async function sendAutoNotify(
   } as VbReplyEvent);
 }
 
+/** Ceiling on the report text inlined into CVB's notify. Generous on purpose:
+ *  this runs on Haiku, so a few extra KB is negligible next to CVB acting on a
+ *  half-read report. Anything longer is pointed at rather than pasted. */
+const INLINE_REPORT_MAX = 4000;
+
 function buildAutoNotifyMessage(ticket: DispatchTicket): string {
   const agent = capitalize(ticket.agent);
   const projectTag = ticket.project ? ` (${ticket.project})` : "";
@@ -137,16 +154,31 @@ function buildAutoNotifyMessage(ticket: DispatchTicket): string {
       : ticket.status === "failed"
       ? `failed:`
       : `was cancelled:`;
-  const body =
-    ticket.status === "done"
-      ? ticket.summary?.trim() || "(no summary)"
-      : ticket.status === "failed"
-      ? ticket.errorMessage ?? "unknown error"
-      : "cancelled.";
+
+  // Prefer the unabridged report. `summary` is capped at 600 chars for the Live
+  // Feed and the chat bubble; handing CVB that version meant he routinely acted
+  // on a report cut off mid-sentence, with no ticket id and no path, so he could
+  // not go and read the rest even when he noticed it was clipped.
+  let body: string;
+  if (ticket.status === "done") {
+    const full = ticket.report?.trim() || "";
+    if (full.length > INLINE_REPORT_MAX) {
+      body = `${full.slice(0, INLINE_REPORT_MAX)}\n\n[Report continues. Full text: .dispatches/${ticket.id}.json -> "report"]`;
+    } else {
+      body = full || ticket.summary?.trim() || "(no summary)";
+    }
+  } else if (ticket.status === "failed") {
+    body = ticket.errorMessage ?? "unknown error";
+  } else {
+    body = "cancelled.";
+  }
+
   return [
     `[Auto-notify] ${agent}${projectTag} ${statusLine}`,
     "",
     body,
+    "",
+    `(ticket ${ticket.id} — full report at .dispatches/${ticket.id}.json)`,
     "",
     `Acknowledge tersely (one line). If this update suggests follow-on work, name it plainly but do NOT dispatch — wait for ${getOwnerName().first}'s next manual turn.`,
   ].join("\n");

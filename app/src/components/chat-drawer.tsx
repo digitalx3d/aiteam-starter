@@ -140,12 +140,18 @@ export function ChatDrawer({ projectSlug }: ChatDrawerProps = {}) {
   }, [getMaxHeight]);
 
   const expandToDefault = useCallback(() => {
+    // On a phone the Bridge behind the drawer is too short to be worth keeping
+    // in view while chatting, so the chat opens to the full height.
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      maximize();
+      return;
+    }
     setCollapsed(false);
     // Use the saved height (already in state) or default.
     if (heightRef.current < MIN_OPEN_HEIGHT) {
       setHeight(DEFAULT_OPEN_HEIGHT);
     }
-  }, []);
+  }, [maximize]);
 
   if (collapsed) {
     return (
@@ -172,11 +178,14 @@ export function ChatDrawer({ projectSlug }: ChatDrawerProps = {}) {
     <div
       ref={drawerRef}
       className="absolute bottom-0 left-0 right-0 flex flex-col bg-background border-t border-border shadow-[0_-4px_16px_rgba(0,0,0,0.25)]"
-      style={{ height: `${height}px` }}
+      // Capped at the parent's height: a height saved on a taller screen, or
+      // the iPhone keyboard shrinking the page, must not push the drag handle
+      // and the top of the chat off screen.
+      style={{ height: `min(${height}px, 100%)` }}
     >
       <div
         onPointerDown={onDragStart}
-        className="shrink-0 h-7 flex items-center justify-between px-3 bg-muted-bg/70 border-b border-border cursor-ns-resize select-none touch-none group"
+        className="shrink-0 h-10 sm:h-7 flex items-center justify-between px-3 bg-muted-bg/70 border-b border-border cursor-ns-resize select-none touch-none group"
         title="Drag to resize"
       >
         <div className="flex-1 flex items-center justify-center text-muted/70 group-hover:text-muted">
@@ -187,7 +196,8 @@ export function ChatDrawer({ projectSlug }: ChatDrawerProps = {}) {
             type="button"
             onClick={maximize}
             title="Maximize"
-            className="p-1 rounded text-muted hover:text-foreground hover:bg-background/40"
+            aria-label="Maximize chat"
+            className="p-2.5 sm:p-1 rounded text-muted hover:text-foreground hover:bg-background/40"
           >
             <ChevronsUp className="h-3.5 w-3.5" />
           </button>
@@ -195,7 +205,8 @@ export function ChatDrawer({ projectSlug }: ChatDrawerProps = {}) {
             type="button"
             onClick={minimize}
             title="Minimize"
-            className="p-1 rounded text-muted hover:text-foreground hover:bg-background/40"
+            aria-label="Minimize chat"
+            className="p-2.5 sm:p-1 rounded text-muted hover:text-foreground hover:bg-background/40"
           >
             <ChevronsDown className="h-3.5 w-3.5" />
           </button>

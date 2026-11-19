@@ -65,6 +65,11 @@ agents/maya/test_charts/
 tools/youtube/out/*.json
 tools/youtube/out/*.txt
 
+# Rendered video/frame output — regenerable from the beat scripts, and large
+# enough (144 MB, one file at 80 MB) that GitHub warns on push. Kept locally,
+# not tracked. Untracked 2026-08-06.
+tools/demo-video/out/
+
 # Personal scout inputs — keep .example version in git, ignore the real one
 tools/youtube/creators.txt
 

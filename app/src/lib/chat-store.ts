@@ -16,6 +16,8 @@ interface DispatchTicket {
   summary: string | null;
   errorMessage: string | null;
   finishedAt: number | null;
+  /** Where the worker's full write-up lives, if its report named a file. */
+  reportPath?: string | null;
 }
 
 function capitalize(s: string): string {
@@ -44,6 +46,14 @@ function injectDispatchReport(ticket: DispatchTicket): void {
       : ticket.status === "failed"
       ? `Worker failed: ${ticket.errorMessage ?? "unknown error"}`
       : "Cancelled.";
+  // Always say WHERE the rest of it is. The summary is capped at 600 chars, and
+  // the line agents put the path on is usually the one that got cut.
+  const where =
+    ticket.status === "done"
+      ? "\n\n" +
+        (ticket.reportPath ? `Full write-up: ${ticket.reportPath}\n` : "") +
+        `Ticket ${ticket.id.slice(0, 8)} (Agents tab) has the complete report.`
+      : "";
   const msg: ChatMessage = {
     id: `dispatch-${ticket.id}-${ticket.status}`,
     role: "assistant",
@@ -51,7 +61,7 @@ function injectDispatchReport(ticket: DispatchTicket): void {
     // lookup keys off this. Project context goes in the body text instead.
     personaName: ticket.agent,
     blocks: [
-      { kind: "text", text: `${emoji}${projectTag} ${text}` },
+      { kind: "text", text: `${emoji}${projectTag} ${text}${where}` },
     ],
     createdAt: ticket.finishedAt ?? Date.now(),
   };
@@ -589,6 +599,9 @@ async function consumeStream(
 export interface SendOptions {
   text: string;
   model: string;
+  /** Reasoning effort (low|medium|high|xhigh|max). Omit to use the CLI default;
+   *  callers omit it for haiku, which has no --effort support. */
+  effort?: string;
   /** Optional project slug. Omit for the default Dashboard chat. */
   projectSlug?: string;
   /** Permission mode. Default: acceptEdits. */
@@ -629,6 +642,7 @@ export async function sendMessage(
       body: JSON.stringify({
         message: trimmed,
         model: opts.model,
+        ...(opts.effort ? { effort: opts.effort } : {}),
         ...(opts.projectSlug ? { project: opts.projectSlug } : {}),
         ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
         ...(() => {
@@ -740,7 +754,12 @@ function setApprovalStatus(
 export async function approveToolCall(
   key: ScopeKey,
   toolUseId: string,
-  opts: { model: string; projectSlug?: string; permissionMode?: "acceptEdits" | "bypassPermissions" }
+  opts: {
+    model: string;
+    effort?: string;
+    projectSlug?: string;
+    permissionMode?: "acceptEdits" | "bypassPermissions";
+  }
 ): Promise<void> {
   const block = findToolUseBlock(key, toolUseId);
   if (!block) return;
@@ -754,6 +773,7 @@ export async function approveToolCall(
   await sendMessage(key, {
     text: `Approved. Please proceed with the previously denied ${block.name} call.`,
     model: opts.model,
+    effort: opts.effort,
     projectSlug: opts.projectSlug,
     permissionMode: opts.permissionMode,
     allowedTools: [block.name],
