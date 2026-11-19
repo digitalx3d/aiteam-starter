@@ -17,29 +17,50 @@ software — and also one person's system with sharp edges. Read "Sharp edges" b
 
 ## What you get
 
-- **The Bridge** — a dashboard chat with CVB, plus per-project chats that each run in
+- **The Bridge**: a dashboard chat with CVB, plus per-project chats that each run in
   that project's folder.
-- **A starter team of four** — CVB + Maya + Devin + Casey, with avatars, profiles, and
+- **A starter team of four**: CVB + Maya + Devin + Casey, with avatars, profiles, and
   distinct voices. Add your own teammates later (see "Growing the team").
-- **Dispatch** — CVB sends work to teammates asynchronously; reports come back as chat
-  bubbles. A guard hook keeps him orchestrating instead of doing the work himself.
-- **Live Feed** — every working agent posts plain-English progress updates (20-60
+- **Dispatch**: CVB sends work to teammates asynchronously; reports come back as chat
+  bubbles, and are kept in full. A guard hook keeps him orchestrating instead of doing
+  the work himself.
+- **Dispatch queue**: chain jobs so one starts when another finishes (copy first, then
+  the image that goes with it). If a job dies on the usage limit, the queue waits for the
+  reset and re-runs it. See `docs/dispatch-queue.md`.
+- **Long jobs**: `scripts/run-job.mjs` runs a test suite or big build past the end of
+  an agent's turn and wakes that agent with the result when it finishes.
+- **Model and effort per chat**: pick Opus, Sonnet, Haiku or Fable and a reasoning
+  effort for each chat or dispatch; the Agents tab shows what each teammate ran on.
+- **Live Feed**: every working agent posts plain-English progress updates (20-60
   words, enforced by a hook) so you can watch the team work.
-- **Task boards** — per-project markdown task boards the dispatch engine keeps updated.
-- **Notes** — a stripped-down Google Keep, one board per project: quick cards for
+- **Task boards**: per-project markdown task boards the dispatch engine keeps updated,
+  with task numbers, sorting and search.
+- **Action Items**: everything assigned to you on any board, in one list; tick it off
+  here and it is done on its board too.
+- **Notes**: a stripped-down Google Keep, one board per project: quick cards for
   ideas, screenshots, and links, with pasted spreadsheet selections rendering as
   real tables.
-- **War Room** — a live multi-agent brainstorm: your whole team argues an idea in
+- **War Room**: a live multi-agent brainstorm: your whole team argues an idea in
   rounds, CVB facilitates and writes up exactly the deliverable you asked for.
   Optionally invite outside consultants (GPT, Gemini, Grok) via an OpenRouter key.
-- **Memory** — sessions archive to a local "vault" folder; ending a session distills a
+- **Memory**: sessions archive to a local "vault" folder; ending a session distills a
   primer the next session auto-loads, so the team remembers.
-- **Big 5** — your top-of-mind priorities, editable from the dashboard, visible to the
+- **Big 5**: your top-of-mind priorities, editable from the dashboard, visible to the
   team.
-- **Skills browser** — every capability your team has installed, in one searchable
+- **Skills browser**: every capability your team has installed, in one searchable
   card grid, tagged by where it came from, one click to read the full instructions.
-- **Shared inbox** — your team posts questions, blockers, and finished-work notes to
-  one running feed; filter by agent or priority and mark things read as you catch up.
+- **Inbox**: the posts addressed to you: questions, decisions and finished work, each
+  with its project, sender and date. Filter by project or sender; read marks follow you
+  across devices.
+- **Chat tidy-up**: move messages you posted in the wrong project's chat, delete them,
+  and get a warning before you send a message that reads like it is about another
+  project.
+- **Projects page**: every project with its open tasks, spend, time spent and what its
+  agents are doing right now.
+- **Servers page**: which of your local servers are up, at a glance (look-only;
+  tested on Windows, the Mac and Linux reader is new and untested).
+- **Phone-friendly**: the dashboard fits a phone screen, so it works over Tailscale from
+  your pocket.
 
 ## Screenshots
 
@@ -47,58 +68,68 @@ software — and also one person's system with sharp edges. Read "Sharp edges" b
 <tr>
 <td width="50%">
 <img src="screenshots/Team.png" alt="Team page">
-<br><sub><b>Team</b> — the starter ships with four (CVB, Maya, Devin, Casey); this is
-what it looks like after growing the team (see "Growing the team" below).</sub>
+<br><sub><b>Team</b>: the starter four (CVB, Maya, Devin, Casey) plus you. Add more
+later (see "Growing the team" below).</sub>
 </td>
 <td width="50%">
 <img src="screenshots/Projects-List.png" alt="Projects list">
-<br><sub><b>Projects</b> — every project on your machine, auto-detected.</sub>
+<br><sub><b>Projects</b>: every project on your machine, auto-detected, with open
+tasks, time and spend.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="screenshots/Project-Page.png" alt="Per-project chat">
-<br><sub><b>Per-project chat</b> — CVB, scoped to that project's own folder, with its
+<br><sub><b>Per-project chat</b>: CVB, scoped to that project's own folder, with its
 own Big 3 and spend.</sub>
 </td>
 <td width="50%">
 <img src="screenshots/Project-Tasks.png" alt="Task board">
-<br><sub><b>Task board</b> — the dispatch engine keeps it updated as work moves.</sub>
+<br><sub><b>Task board</b>: numbered, searchable, and kept updated by the dispatch
+engine as work moves.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="screenshots/Project-Notes.png" alt="Notes">
-<br><sub><b>Notes</b> — quick cards per project; pasted spreadsheet selections render
+<br><sub><b>Notes</b>: quick cards per project; pasted spreadsheet selections render
 as real tables.</sub>
 </td>
 <td width="50%">
 <img src="screenshots/Agent-Details.png" alt="Agent detail page">
-<br><sub><b>Agent detail</b> — full profile for any teammate: voice, tools, inbox,
+<br><sub><b>Agent detail</b>: full profile for any teammate: voice, tools, inbox,
 completed work.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="screenshots/Skills-Library.png" alt="Skills browser">
-<br><sub><b>Skills</b> — searchable, tagged by source. The starter seeds one; it grows
+<br><sub><b>Skills</b>: searchable, tagged by source. The starter seeds one; it grows
 as you and your agents add more.</sub>
 </td>
 <td width="50%">
-<img src="screenshots/Shared-Inbox.png" alt="Shared inbox">
-<br><sub><b>Inbox</b> — the team's questions, blockers, and finished-work notes in one
-feed.</sub>
+<img src="screenshots/Shared-Inbox.png" alt="Inbox">
+<br><sub><b>Inbox</b>: what the team needs from you, with project, sender and date on
+every post.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%">
 <img src="screenshots/War-Room.png" alt="War Room">
-<br><sub><b>War Room</b> — drop an idea, the whole team argues it out live.</sub>
+<br><sub><b>War Room</b>: drop an idea, the whole team argues it out live.</sub>
 </td>
 <td width="50%">
 <img src="screenshots/Settings.png" alt="Settings page">
-<br><sub><b>Settings</b> — every path the app uses, editable without touching a config
+<br><sub><b>Settings</b>: every path the app uses, editable without touching a config
 file.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="screenshots/Action-Items.png" alt="Action Items">
+<br><sub><b>Action Items</b>: everything on any board that is waiting on you.</sub>
+</td>
+<td width="50%">
 </td>
 </tr>
 </table>
@@ -176,6 +207,15 @@ npm install -g pm2
 pm2 start ecosystem.config.js
 pm2 save
 ```
+
+To come back after a reboot, exactly one thing should run `pm2 resurrect` at logon. On
+Windows, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-pm2-startup.ps1`
+registers that one task (check it after a restart with `scripts/verify-startup.ps1`); on
+Mac or Linux, run `pm2 startup` and follow what it prints.
+
+After you pull an update, rebuild and restart with `node scripts/deploy-dashboard.mjs`.
+It refuses while a teammate is mid-task, because a restart would kill them; add
+`--force` to deploy anyway.
 
 Remote access from your phone, without opening ports, via
 [Tailscale](https://tailscale.com) (free for personal use). Only do this on a tailnet
