@@ -43,7 +43,7 @@ export interface RosterMember {
   provider?: "claude" | "openrouter";
   /** Per-member model override: a Claude alias, or an OpenRouter model id for outsiders. */
   model?: string;
-  /** Optional John-supplied role/context for this session, appended to the system prompt. */
+  /** Optional owner-supplied role/context for this session, appended to the system prompt. */
   extra?: string;
 }
 
@@ -86,7 +86,7 @@ export interface WarRoomSession {
   pendingInterjections: string[];
   wrapRequested: boolean;
   cancelRequested: boolean;
-  /** When true, the engine holds at the next round boundary so John can read /
+  /** When true, the engine holds at the next round boundary so the owner can read /
    *  type. Cleared by Resume. */
   paused: boolean;
 }

@@ -7,8 +7,8 @@ const DEFAULT_PROJECT_SLUG = "aiTeam";
  * Pass-through cases: http(s), data:, blob:, and absolute URL paths starting with "/".
  *
  * Recognised local forms:
- *   - "Z:\\GitHub\\<project>\\chat-images\\<file>" (Windows absolute path)
- *   - "Z:/GitHub/<project>/chat-images/<file>"   (forward-slash absolute)
+ *   - "C:\\Code\\<project>\\chat-images\\<file>"  (Windows absolute path)
+ *   - "C:/Code/<project>/chat-images/<file>"     (forward-slash absolute)
  *   - "chat-images/<file>"                        (relative — needs project context)
  *   - "<project>/chat-images/<file>"              (project-prefixed relative)
  *
@@ -25,7 +25,7 @@ export function chatImageSrcToUrl(
 
   // react-markdown / micromark URL-encodes backslashes to %5C before urlTransform
   // sees the value, so we have to undo that BEFORE replacing backslashes — both
-  // forms (`Z:\GitHub\...` raw and `Z:%5CGitHub%5C...` encoded) must collapse to
+  // forms (`C:\Code\...` raw and `C:%5CCode%5C...` encoded) must collapse to
   // forward slashes so the winMatch regex below recognises the path shape.
   const normalised = src
     .replace(/%5C/gi, "/")

@@ -24,8 +24,10 @@ const REPO_ROOT = path.resolve(
 );
 
 const FIELDS = {
-  projectsRoot: { env: "PROJECTS_ROOT", def: () => "Z:\\GitHub" },
-  vaultDir: { env: "VAULT_DIR", def: () => path.join("Z:\\GitHub", "vault") },
+  // Same defaults as setup.mjs and app/src/lib/config.ts: the folder the
+  // aiTeam repo sits in, and a vault beside it.
+  projectsRoot: { env: "PROJECTS_ROOT", def: () => path.dirname(REPO_ROOT) },
+  vaultDir: { env: "VAULT_DIR", def: () => path.join(path.dirname(REPO_ROOT), "vault") },
   claudeProjectsDir: {
     env: "CLAUDE_PROJECTS_DIR",
     def: () => path.join(os.homedir(), ".claude", "projects"),

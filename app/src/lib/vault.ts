@@ -107,7 +107,7 @@ function buildTranscriptMarkdown(opts: BuildOptions): string {
 
 /**
  * Builds the archive path: vault/transcripts/<YYYY-MM>/<YYYY-MM-DD>T<HHmm>-<safe-scope>.md
- * Safe-scope replaces ":" with "-" so "project:carpoolq" becomes "project-carpoolq".
+ * Safe-scope replaces ":" with "-" so "project:my-app" becomes "project-my-app".
  */
 function archivePath(scope: string, endedAt: Date): { absolute: string; vaultRelative: string } {
   const p = isoDateParts(endedAt);

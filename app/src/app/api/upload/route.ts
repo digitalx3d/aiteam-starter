@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // aiTeam itself doesn't appear in the project list (HIDDEN_PROJECTS) but the
 // default dashboard chat still needs an image dir. Map missing/default slug to
-// "aiTeam" so the path resolves to Z:\GitHub\aiTeam\chat-images\.
+// "aiTeam" so the path resolves to <projects root>\aiTeam\chat-images\.
 const DEFAULT_PROJECT_SLUG = "aiTeam";
 
 const ALLOWED_MIME = new Set([

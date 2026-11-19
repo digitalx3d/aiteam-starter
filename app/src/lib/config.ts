@@ -37,6 +37,13 @@ export interface ConfigFieldDef {
   /** "dir" and "file" get an existence check on the Settings page; "command" doesn't. */
   kind: "dir" | "file" | "command";
   defaultValue: () => string;
+  /** Never sent to the browser: the Settings page only learns whether it is set. */
+  secret?: boolean;
+  /**
+   * The web Settings page may not change it; only setup.mjs or a hand edit of
+   * the settings file can. For values that decide what program the app runs.
+   */
+  webLocked?: boolean;
 }
 
 export const CONFIG_FIELDS: ConfigFieldDef[] = [
@@ -56,7 +63,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
       "Folder scanned for projects. New projects are created here; project chats run with their folder as the working directory.",
     envVar: "PROJECTS_ROOT",
     kind: "dir",
-    defaultValue: () => "Z:\\GitHub",
+    // The folder the aiTeam repo sits in (cwd is app/), same default setup.mjs offers.
+    defaultValue: () => path.resolve(process.cwd(), "..", ".."),
   },
   {
     key: "vaultDir",
@@ -65,7 +73,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
       "The Obsidian vault — session transcripts, rolling primers, Indy's digests, and decisions are read and written here.",
     envVar: "VAULT_DIR",
     kind: "dir",
-    defaultValue: () => path.join("Z:\\GitHub", "vault"),
+    defaultValue: () => path.resolve(process.cwd(), "..", "..", "vault"),
   },
   {
     key: "agentsDir",
@@ -111,6 +119,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     envVar: "CLAUDE_BIN",
     kind: "command",
     defaultValue: () => "claude",
+    webLocked: true,
   },
   {
     key: "openrouterApiKey",
@@ -120,6 +129,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     envVar: "OPENROUTER_API_KEY",
     kind: "command",
     defaultValue: () => "",
+    secret: true,
   },
 ];
 
@@ -195,6 +205,75 @@ export interface ConfigFieldInfo {
   defaultValue: string;
   /** Whether the path exists on disk. Always true for kind "command" (not checked). */
   exists: boolean;
+  /** Secret field: `value` and `defaultValue` are always "", `isSet` says whether one is saved. */
+  secret: boolean;
+  isSet: boolean;
+  /** Not editable from the web Settings page. */
+  webLocked: boolean;
+}
+
+/** Every resolved value except the secret ones; what the browser may see. */
+export function getPublicConfig(): Partial<AiTeamConfig> {
+  const cfg = getConfig();
+  const out: Partial<AiTeamConfig> = {};
+  for (const field of CONFIG_FIELDS) {
+    if (!field.secret) out[field.key] = cfg[field.key];
+  }
+  return out;
+}
+
+/**
+ * Settings the web PUT may change. claudeBin is excluded: it is the program
+ * the app launches for every chat, so only setup.mjs or a hand edit of the
+ * settings file may set it.
+ */
+export const WEB_EDITABLE_KEYS: readonly ConfigKey[] = CONFIG_FIELDS.filter(
+  (f) => !f.webLocked
+).map((f) => f.key);
+
+interface RawCache {
+  mtimeMs: number | null;
+  values: Record<string, unknown>;
+}
+let rawCache: RawCache | null = null;
+
+/** The whole settings file, including keys outside CONFIG_KEYS. {} if missing or malformed. */
+function readRawSettings(): Record<string, unknown> {
+  let mtimeMs: number | null = null;
+  try {
+    mtimeMs = fs.statSync(SETTINGS_FILE).mtimeMs;
+  } catch {
+    rawCache = { mtimeMs: null, values: {} };
+    return rawCache.values;
+  }
+  if (rawCache && rawCache.mtimeMs === mtimeMs) return rawCache.values;
+  let values: Record<string, unknown> = {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")) as unknown;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      values = raw as Record<string, unknown>;
+    }
+  } catch {
+    // Malformed: no extras.
+  }
+  rawCache = { mtimeMs, values };
+  return values;
+}
+
+/**
+ * Extra host names the dashboard answers to, beyond localhost, 127.0.0.1 and
+ * ::1 (lib/request-guard.ts). Set by hand in the settings file, for example
+ * `"allowedHosts": ["my-pc.tail1234.ts.net"]` for Tailscale, or one
+ * comma-separated string. Names only, no scheme or port; lowercased.
+ * Deliberately not on the Settings page: it widens the front door.
+ */
+export function getExtraAllowedHosts(): string[] {
+  const v = readRawSettings().allowedHosts;
+  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
+  return list
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim().toLowerCase().replace(/\.$/, ""))
+    .filter(Boolean);
 }
 
 export function getConfigInfo(): {
@@ -219,16 +298,21 @@ export function getConfigInfo(): {
         exists = false;
       }
     }
+    const secret = Boolean(field.secret);
     return {
       key: field.key,
       label: field.label,
       description: field.description,
       envVar: field.envVar,
       kind: field.kind,
-      value,
+      // A secret never leaves the server, not even to the owner's own page.
+      value: secret ? "" : value,
       source,
-      defaultValue: field.defaultValue(),
+      defaultValue: secret ? "" : field.defaultValue(),
       exists,
+      secret,
+      isSet: value.length > 0,
+      webLocked: Boolean(field.webLocked),
     };
   });
   return { settingsFile: SETTINGS_FILE, fields };

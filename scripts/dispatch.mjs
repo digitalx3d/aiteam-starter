@@ -53,14 +53,11 @@ if (!brief) {
   process.exit(2);
 }
 
-// Dashboard port resolution: DISPATCH_URL wins outright, then
-// ~/.aiteam/settings.json appPort (the installed port), then the PORT env
-// var, then 3900 — the aiTeam dashboard's reserved default (see
-// vault/team/rules.md "Reserved ports"). History: was 3000 until 2026-05-29,
-// when clearing the machine-level PORT=3900 env var (Devin's 5/20 footgun fix)
-// silently broke this fallback because $PORT was empty and the script fell
-// through to 3000 where nothing was listening. settings.json outranks PORT
-// for the same reason: it is explicit and per-install, not ambient.
+// Dashboard port: DISPATCH_URL wins outright, then ~/.aiteam/settings.json
+// appPort (the installed port), then 3900. Never the generic PORT environment
+// variable: a stray PORT left by some other tool would silently send the
+// courier to the wrong place, and the failure looks like a broken teammate
+// rather than a broken messenger.
 function resolvePort() {
   try {
     const s = JSON.parse(
@@ -70,7 +67,7 @@ function resolvePort() {
   } catch {
     /* fall through */
   }
-  return String(process.env.PORT || 3900);
+  return "3900";
 }
 const url =
   process.env.DISPATCH_URL || `http://localhost:${resolvePort()}/api/dispatch`;
@@ -106,7 +103,7 @@ try {
 } catch (err) {
   console.error(`error: dispatch request failed: ${err.message}`);
   console.error(
-    `(is the aiTeam app running at ${url}? set DISPATCH_URL or PORT to override.)`
+    `(is the aiTeam app running at ${url}? set appPort in ~/.aiteam/settings.json, or DISPATCH_URL, to override.)`
   );
   process.exit(1);
 }

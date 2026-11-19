@@ -1,7 +1,8 @@
 import {
   CONFIG_KEYS,
-  getConfig,
+  WEB_EDITABLE_KEYS,
   getConfigInfo,
+  getPublicConfig,
   saveSettings,
   type ConfigKey,
 } from "@/lib/config";
@@ -9,10 +10,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Secrets (the OpenRouter key) never appear here: `values` leaves them out and
+// each field carries only `isSet`. The front-door guard (src/proxy.ts) keeps
+// other sites from reading or writing this route at all.
 function payload(): string {
   const info = getConfigInfo();
   return JSON.stringify({
-    values: getConfig(),
+    values: getPublicConfig(),
     settingsFile: info.settingsFile,
     fields: info.fields,
   });
@@ -44,6 +48,14 @@ export async function PUT(request: Request) {
   const updates: Partial<Record<ConfigKey, string>> = {};
   for (const key of CONFIG_KEYS) {
     if (!(key in body.values)) continue;
+    if (!WEB_EDITABLE_KEYS.includes(key)) {
+      return new Response(
+        JSON.stringify({
+          error: `${key} can't be changed from the web page; edit the settings file or re-run setup.mjs`,
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
     const v = body.values[key];
     if (typeof v !== "string") {
       return new Response(

@@ -7,15 +7,16 @@
 // and re-asserts the tunnel only when it's actually gone (otherwise a no-op).
 //
 // Register once:
-//   pm2 start Z:\GitHub\aiTeam\scripts\tunnel-watchdog.mjs --name tunnel-watchdog
+//   pm2 start scripts/tunnel-watchdog.mjs --name tunnel-watchdog   (from the repo root)
 //   pm2 save
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// Dashboard port: ~/.aiteam/settings.json appPort > PORT env > 3900 —
-// the same resolution the dispatch courier and ecosystem.config.js use.
+// Dashboard port: ~/.aiteam/settings.json appPort, else 3900; never the
+// generic PORT variable. Same rule as the dispatch courier and
+// ecosystem.config.js.
 function resolvePort() {
   try {
     const s = JSON.parse(
@@ -25,7 +26,7 @@ function resolvePort() {
   } catch {
     /* fall through */
   }
-  return String(process.env.PORT || "3900");
+  return "3900";
 }
 const PORT = resolvePort();
 const INTERVAL_MS = 10 * 60 * 1000; // 10 minutes

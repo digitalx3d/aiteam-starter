@@ -13,7 +13,7 @@ import { getConfig } from "./config";
  *   <home>/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl
  * where <encoded-cwd> replaces every non-alphanumeric character in the
  * absolute cwd with `-` (one hyphen per character, not collapsed) — e.g.
- * "Z:\Github\Peg Slideshow" -> "Z--Github-Peg-Slideshow". Replacing only
+ * "C:\Code\My Project" -> "C--Code-My-Project". Replacing only
  * `:`, `\`, `/` (as this used to) leaves spaces and other punctuation
  * untouched, so any project whose folder name isn't plain alphanumeric
  * silently never finds its session log.
@@ -180,7 +180,7 @@ export async function parseSessionLog(filePath: string): Promise<ChatMessage[]> 
     if (blocks.length === 0) continue;
     // Drop the internal [Auto-notify] prompts vb-notifier injects to poke CVB. They
     // are recorded as user turns in the session log but are plumbing (meant for CVB,
-    // not something John typed), so they must never hydrate into the visible chat.
+    // not something the owner typed), so they must never hydrate into the visible chat.
     const first = blocks[0];
     if (role === "user" && first?.kind === "text" && first.text.startsWith("[Auto-notify]")) {
       continue;

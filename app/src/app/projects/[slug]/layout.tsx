@@ -15,7 +15,7 @@ interface LayoutProps {
 }
 
 export default async function ProjectLayout({ children, params }: LayoutProps) {
-  // params.slug arrives still URL-encoded (e.g. "Peg%20Slideshow"). Decode it
+  // params.slug arrives still URL-encoded (e.g. "My%20Project"). Decode it
   // once here and pass the clean value to every child — they each re-encode
   // it exactly once when building hrefs/fetch URLs. Passing the raw encoded
   // value down caused double-encoding (404s) for any project name with a

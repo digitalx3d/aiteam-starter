@@ -11,9 +11,9 @@
  *     his own status/memory, vault notes) — allowed.
  *   - CVB may NOT write DELIVERABLES (project code, copy, images) — denied, told to dispatch.
  *   - CVB may NOT write GOVERNANCE files (personas: soul/agents/tools/heartbeat/projects;
- *     vault/team canon) even where an allow rule would match — denied, told to ask John.
- *   - Bash is default-allow. STANDING RELEASE AUTHORIZATION (John, 2026-07-05; supersedes
- *     the 2026-07-02 one-time grant): ordinary git writes (add/commit/merge/checkout/plain
+ *     vault/team canon) even where an allow rule would match — denied, told to ask the owner.
+ *   - Bash is default-allow. STANDING RELEASE AUTHORIZATION (the owner's
+ *     standing grant to CVB): ordinary git writes (add/commit/merge/checkout/plain
  *     push), builds, pm2, and deploy scripts are ALLOWED — CVB ships reviewed work himself.
  *     Still DENIED: history surgery (git rebase|reset|clean|cherry-pick|am|apply), force or
  *     delete pushes, commit --amend, package publishing, image-gen python, and raw file

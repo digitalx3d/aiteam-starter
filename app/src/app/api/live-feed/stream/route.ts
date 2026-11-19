@@ -47,7 +47,7 @@ function parseNow(raw: string): { kind: Kind; text: string; project?: string } |
     .filter(Boolean)
     .slice(0, 14)
     .map((l) => (l.length <= 600 ? l : l.slice(0, 597) + "..."));
-  // Header supports the [project] tag: `working [carpoolq] — text`
+  // Header supports the [project] tag: `working [my-app] — text`
   const m = first.match(/^([a-z]+)\s*(?:\[([^\]]+)\])?\s*(?:—|--|-)\s*(.+)$/i);
   if (!m) return { kind: "other", text: [first, ...rest].join("\n") };
   const kindRaw = m[1].toLowerCase() as Kind;

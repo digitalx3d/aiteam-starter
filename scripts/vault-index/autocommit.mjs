@@ -1,9 +1,9 @@
 // Auto-commit triggers (short-term memory Priority 1, approved 2026-07-02;
-// quiet period + turn floor revised 2026-07-09 after John flagged chats
+// quiet period + turn floor revised 2026-07-09 after the owner flagged chats
 // archiving with barely any real back-and-forth).
 //
 // The End Session commit (archive -> distill -> fresh primer) used to fire
-// ONLY when John clicked the button. This module is the safety net behind
+// ONLY when the owner clicked the button. This module is the safety net behind
 // the button: it walks the dashboard's chat-state files and auto-commits any
 // chat session that is
 //   (a) IDLE  - no session-log activity for AUTOCOMMIT_IDLE_HOURS (default 72), or
@@ -123,8 +123,8 @@ function chatStatesDir(cfg) {
 // app/src/lib/session-log.ts's encodeCwdForClaudeCode for the fuller writeup
 // and verification against real examples). This used to only replace `:`,
 // `/`, `\`, which silently split any project with a space/punctuation in its
-// name into the wrong scope (confirmed 2026-07-12 via pm2 logs showing
-// "Peg Slideshow" split into two different tracked scopes).
+// name into the wrong scope (confirmed 2026-07-12 via pm2 logs showing a
+// project named with a space split into two different tracked scopes).
 function encodeCwd(cwd) {
   return cwd.replace(/[^a-zA-Z0-9]/g, "-");
 }
@@ -153,8 +153,8 @@ export function listChatScopes(cfg) {
     // The filename is sanitized for filesystem safety (app/src/lib/chat-state.ts's
     // fileForKey), which collapses spaces/underscores/other punctuation all to
     // "_" — recovering the real slug by parsing that back apart is lossy and
-    // silently produces the wrong project name (confirmed 2026-07-12: "Peg
-    // Slideshow" -> "Peg_Slideshow"). The state file's own JSON content stores
+    // silently produces the wrong project name (confirmed 2026-07-12: "My
+    // Project" -> "My_Project"). The state file's own JSON content stores
     // the true slug losslessly (see chat-state.ts); prefer that. Fall back to
     // the old filename-derived value only for a state file written before this
     // fix that hasn't been rewritten yet.

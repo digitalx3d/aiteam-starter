@@ -41,7 +41,7 @@ export function isHandoffAllowed(from: string, to: string): boolean {
 /**
  * Kill switch. Auto-handoff is OFF unless a flag file exists at
  * <aiteamDir>/.auto-handoff-enabled. Opt-in by design: agents auto-triggering each
- * other is powerful, so it ships disabled and John turns it on when he can watch.
+ * other is powerful, so it ships disabled and the owner turns it on when they can watch.
  */
 export function isAutoHandoffEnabled(): boolean {
   try {

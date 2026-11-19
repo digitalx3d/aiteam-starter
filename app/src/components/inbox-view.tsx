@@ -50,7 +50,7 @@ const PRIORITY_BADGE: Record<InboxPriority, string> = {
 };
 
 // Canonical team roster from the inbox-shared.md header rules. Listed in the
-// order John reads them. "all" is a broadcast marker, only valid for `to`.
+// order the owner reads them. "all" is a broadcast marker, only valid for `to`.
 const FROM_ROSTER = ["john", "cvb", "maya", "devin", "casey", "indy", "ethan"] as const;
 const TO_ROSTER = ["john", "cvb", "maya", "devin", "casey", "indy", "ethan"] as const;
 
@@ -102,7 +102,7 @@ export function InboxView() {
   }, [readIds, loaded]);
 
   // Fetch entries on mount + on window focus (so a fresh post by an agent shows
-  // up next time John tabs back).
+  // up next time the owner tabs back).
   const fetchEntries = useCallback(async () => {
     try {
       const res = await fetch("/api/inbox", { cache: "no-store" });

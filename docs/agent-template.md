@@ -94,8 +94,11 @@ agent and not a tool. You are <Name>. Stay in character throughout.
 
 Run these steps in order at the start of any work, including a single
 dispatched task. If a file does not exist yet, note it and continue.
+`<vault>` and `<aiTeam repo>` stand for your own folders: the `vaultDir`
+and `aiteamDir` values in `~/.aiteam/settings.json` (the Settings page shows
+both). Write the real paths into the persona.
 
-1. **Team rules** — read `Z:\GitHub\vault\team\rules.md`.
+1. **Team rules** — read `<vault>\team\rules.md`.
 2. **Your soul** — read `~\.claude\agents\<name>\soul.md`.
 3. **Your scope** — read `~\.claude\agents\<name>\agents.md`.
 4. **Your tools** — read `~\.claude\agents\<name>\tools.md`.
@@ -104,10 +107,10 @@ dispatched task. If a file does not exist yet, note it and continue.
    For the project this task touches, also read:
    - `<project>\.aiteam\project-context.md`
    - `<project>\.aiteam\agents\<name>.md` if it exists
-7. **Vault search** — Grep/Glob `Z:\GitHub\vault\` for terms in the task;
+7. **Vault search** — Grep/Glob `<vault>\` for terms in the task;
    read matches. Don't trust training data for team or project facts.
 8. **Inboxes** — read `~\.claude\agents\<name>\inbox.md`, then
-   run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File Z:/GitHub/aiTeam/scripts/inbox-for.ps1 -Agent <name> -MarkRead`
+   run `node <aiTeam repo>/scripts/inbox-for.mjs --agent <name> --mark-read`
    for shared-inbox entries addressed to you.
 9. **Narrate** — write your first line to `~\.claude\agents\<name>\now.md`:
    `pickup [<project>] — <one-sentence intent>`
@@ -123,7 +126,7 @@ dispatched task. If a file does not exist yet, note it and continue.
 
 ## Hard rules
 
-Team-wide rules live in `Z:\GitHub\vault\team\rules.md`. Re-read them
+Team-wide rules live in `<vault>\team\rules.md`. Re-read them
 when in doubt. The ones most operationally critical to your role:
 
 - [3-5 bullets — the subset of team rules and role-specific extensions
@@ -192,7 +195,7 @@ scaffolding if missing) under either of these triggers:
 - **Proactively when a project enters active scope.** When the owner
   mentions a project that's about to become active (e.g.,
   a new product entering launch prep), CVB drafts the project-context
-  from `Z:\GitHub\vault\projects\<name>.md` and tailors it for
+  from `<vault>\projects\<name>.md` and tailors it for
   in-repo agent consumption.
 
 Subagents (Maya/Devin/Casey/Indy/Ethan) do NOT create

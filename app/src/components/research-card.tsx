@@ -24,7 +24,7 @@ export async function ResearchCard() {
 
       {!latest ? (
         <div className="rounded-lg border border-border bg-card-bg p-4 text-xs text-muted">
-          No digests yet. Indy runs Mon + Thu at 7am Phoenix.
+          No digests yet. Indy runs Mon + Thu at 7am.
         </div>
       ) : (
         <Link

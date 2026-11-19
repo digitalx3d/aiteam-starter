@@ -136,8 +136,8 @@ export async function POST(request: Request) {
           //  - Task(): runs a subagent synchronously, blocking the chat — CVB
           //    must use the async dispatch.mjs instead.
           //  - AskUserQuestion: needs an interactive picker the dashboard has no
-          //    channel for, so it resolves without John ever seeing the question
-          //    (CVB ends up answering for him). CVB should ask in plain chat text.
+          //    channel for, so it resolves without the owner ever seeing the question
+          //    (CVB ends up answering for them). CVB should ask in plain chat text.
           disallowedTools: ["Task", "AskUserQuestion"],
           appendSystemPrompt,
           // CVB's guard (blocks hand-rolling deliverables) + clock (injects current

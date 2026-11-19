@@ -14,6 +14,11 @@ interface FieldInfo {
   source: "settings" | "env" | "default";
   defaultValue: string;
   exists: boolean;
+  /** The server never sends a secret's value, only whether one is saved. */
+  secret: boolean;
+  isSet: boolean;
+  /** Read-only here; changed through the settings file or setup.mjs. */
+  webLocked: boolean;
 }
 
 interface SettingsPayload {
@@ -26,8 +31,8 @@ function draftFromFields(fields: FieldInfo[]): Record<string, string> {
   const draft: Record<string, string> = {};
   for (const f of fields) {
     // Text in the box = a saved override. Empty box = inherited (env/default),
-    // shown via the placeholder.
-    draft[f.key] = f.source === "settings" ? f.value : "";
+    // shown via the placeholder. A secret's box always starts empty.
+    draft[f.key] = f.source === "settings" && !f.secret ? f.value : "";
   }
   return draft;
 }
@@ -86,12 +91,29 @@ export function SettingsForm() {
     setError(null);
   }
 
-  async function save() {
-    if (dirty.size === 0 || saving) return;
+  function pendingValues(): Record<string, string> {
+    const values: Record<string, string> = {};
+    for (const key of dirty) {
+      const field = data?.fields.find((f) => f.key === key);
+      if (field?.webLocked) continue;
+      // An empty secret box means "leave it alone"; removing a saved key is
+      // its own button, so a stray click-and-clear can't wipe it.
+      if (field?.secret && !(draft[key] ?? "").trim()) continue;
+      values[key] = draft[key] ?? "";
+    }
+    return values;
+  }
+
+  async function save(override?: Record<string, string>) {
+    if (saving) return;
+    const values = override ?? pendingValues();
+    if (Object.keys(values).length === 0) {
+      setDraft(data ? draftFromFields(data.fields) : {});
+      setDirty(new Set());
+      return;
+    }
     setSaving(true);
     setError(null);
-    const values: Record<string, string> = {};
-    for (const key of dirty) values[key] = draft[key] ?? "";
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -131,6 +153,11 @@ export function SettingsForm() {
           <div className="space-y-5">
             {data.fields.map((field) => {
               const isDirty = dirty.has(field.key);
+              const placeholder = field.secret
+                ? field.isSet
+                  ? "A key is saved (hidden). Type a new one to replace it."
+                  : "Not set"
+                : field.value;
               return (
                 <div key={field.key}>
                   <div className="flex items-center gap-2 mb-1">
@@ -151,19 +178,53 @@ export function SettingsForm() {
                   <p className="text-[11px] text-muted mb-1.5 leading-relaxed">
                     {field.description}
                   </p>
-                  <input
-                    id={`setting-${field.key}`}
-                    type="text"
-                    value={draft[field.key] ?? ""}
-                    onChange={(e) => onChange(field.key, e.target.value)}
-                    placeholder={field.value}
-                    spellCheck={false}
-                    className={
-                      "w-full text-sm font-mono bg-background border rounded px-2.5 py-1.5 text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent " +
-                      (isDirty ? "border-accent/60" : "border-border")
-                    }
-                  />
-                  {draft[field.key] === "" && field.source === "settings" && isDirty && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`setting-${field.key}`}
+                      type={field.secret ? "password" : "text"}
+                      autoComplete="off"
+                      value={field.webLocked ? field.value : (draft[field.key] ?? "")}
+                      onChange={(e) => onChange(field.key, e.target.value)}
+                      readOnly={field.webLocked}
+                      aria-readonly={field.webLocked || undefined}
+                      placeholder={placeholder}
+                      spellCheck={false}
+                      className={
+                        "w-full text-sm font-mono bg-background border rounded px-2.5 py-1.5 text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent " +
+                        (field.webLocked ? "opacity-70 cursor-not-allowed " : "") +
+                        (isDirty ? "border-accent/60" : "border-border")
+                      }
+                    />
+                    {field.secret && field.isSet && field.source === "settings" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Remove the saved ${field.label}?`)) {
+                            void save({ [field.key]: "" });
+                          }
+                        }}
+                        disabled={saving}
+                        className="shrink-0 px-2.5 py-1.5 text-xs rounded border border-border text-muted hover:text-foreground hover:border-foreground/40 disabled:opacity-50"
+                      >
+                        Remove key
+                      </button>
+                    )}
+                  </div>
+                  {field.webLocked && (
+                    <p className="text-[10px] text-muted mt-1">
+                      Locked here, because it decides which program the app
+                      runs. Change it in{" "}
+                      <span className="font-mono">{data.settingsFile}</span> or
+                      by re-running <span className="font-mono">setup.mjs</span>.
+                    </p>
+                  )}
+                  {field.secret && field.isSet && field.source === "env" && (
+                    <p className="text-[10px] text-muted mt-1">
+                      Set by the <span className="font-mono">{field.envVar}</span>{" "}
+                      environment variable. A key saved here takes precedence.
+                    </p>
+                  )}
+                  {!field.secret && draft[field.key] === "" && field.source === "settings" && isDirty && (
                     <p className="text-[10px] text-muted mt-1">
                       Empty clears the saved value — reverts to{" "}
                       <span className="font-mono">{field.defaultValue}</span>
@@ -191,7 +252,7 @@ export function SettingsForm() {
               )}
               <button
                 type="button"
-                onClick={save}
+                onClick={() => void save()}
                 disabled={dirty.size === 0 || saving}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >

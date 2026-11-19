@@ -9,7 +9,7 @@ import { subscribe as subscribeDispatch, type DispatchTicket } from "./dispatch-
 
 // VB Notifier — server-side subscriber to dispatch completions that auto-pokes
 // Von Braun's dashboard session with an [Auto-notify] message so VB stays
-// aware between John's manual turns. Uses Haiku for the auto-ack to keep
+// aware between the owner's manual turns. Uses Haiku for the auto-ack to keep
 // running cost low; VB's persona limits him to a one-line acknowledgment
 // unless action is genuinely needed.
 
@@ -68,7 +68,7 @@ async function sendAutoNotify(
   ticket: DispatchTicket,
   scope: string
 ): Promise<void> {
-  // Only auto-poke a session that John has already started. If there's no
+  // Only auto-poke a session that the owner has already started. If there's no
   // active VB session for this scope yet, skip — there's nothing to inject
   // into and we shouldn't auto-create a session.
   const slug = ticket.project ?? null;

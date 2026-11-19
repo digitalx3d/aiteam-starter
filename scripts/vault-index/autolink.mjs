@@ -93,7 +93,7 @@ export function computeMatches(note, body, candidates) {
   const fmAgents = new Set(
     [...(note.agents || []), note.extra?.from].filter(Boolean).map((a) => String(a).toLowerCase())
   );
-  fmAgents.delete("john"); // John is the human, not an agent persona
+  fmAgents.delete("john"); // The owner is the human, not an agent persona
   for (const a of fmAgents) tags.add(`agent/${a}`);
   for (const a of BODY_SCAN_AGENTS) {
     if (wordMatch(searchable, a)) tags.add(`agent/${a}`);

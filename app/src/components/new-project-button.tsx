@@ -10,7 +10,7 @@ type Mode = "new" | "existing";
 export function NewProjectButton() {
   const router = useRouter();
   const cfg = useServerConfig();
-  // e.g. "Z:\GitHub\" — separator inferred from the configured path itself.
+  // e.g. "C:\Code\" — separator inferred from the configured path itself.
   const rootPrefix = cfg
     ? `${cfg.projectsRoot}${cfg.projectsRoot.includes("\\") ? "\\" : "/"}`
     : "";

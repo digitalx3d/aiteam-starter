@@ -203,7 +203,7 @@ interface OutsiderRow {
   displayName: string;
   model: string;
   enabled: boolean;
-  /** The custom row lets John type both the name and the model id. */
+  /** The custom row lets the owner type both the name and the model id. */
   customName?: boolean;
 }
 
@@ -653,7 +653,7 @@ export function WarRoom() {
               <textarea
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
-                placeholder="e.g. A private app for our household to forecast our cash flow 30 days out."
+                placeholder="e.g. A private app to forecast our household cash flow 30 days out."
                 rows={3}
                 className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
               />

@@ -11,7 +11,7 @@ interface Params {
  * POST /api/warroom/:id/pause
  * Body: { paused: boolean }
  * paused=true  -> the engine holds at the next round boundary (and before the
- *                 final write-up) so John can read and type.
+ *                 final write-up) so the owner can read and type.
  * paused=false -> resume.
  */
 export async function POST(request: Request, { params }: Params) {

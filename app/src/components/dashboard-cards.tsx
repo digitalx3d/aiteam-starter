@@ -43,7 +43,7 @@ const PRIORITY_TITLE: Record<TaskPriority, string> = {
   low: "low priority",
 };
 
-/** The little leading marker that tells John where an item came from. */
+/** The little leading marker that tells the owner where an item came from. */
 function ItemMarker({ item }: { item: CardItem }) {
   if (item.source === "big3") {
     return (

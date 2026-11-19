@@ -14,7 +14,7 @@ import { getConfig } from "./config";
  *  - PreToolUse (feed-guard.mjs): validates CVB's own Live Feed posts (now.md)
  *    against the team posting contract. `--project any` because CVB works
  *    across projects — a [project] tag is still required, its value is free.
- *  - UserPromptSubmit (cvb-clock.mjs): injects the current Phoenix time each turn.
+ *  - UserPromptSubmit (cvb-clock.mjs): injects the owner's local time each turn.
  *
  * Part of the agent-governance-lockdown project.
  */

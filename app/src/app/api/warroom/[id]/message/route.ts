@@ -27,7 +27,7 @@ function ownerMember() {
 /**
  * POST /api/warroom/:id/message
  * Body: { text }
- * John's interjection. Shows immediately as a bubble and is folded into the
+ * The owner's interjection. Shows immediately as a bubble and is folded into the
  * next round's context for every agent.
  */
 export async function POST(request: Request, { params }: Params) {

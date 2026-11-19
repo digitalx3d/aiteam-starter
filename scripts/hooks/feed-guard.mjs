@@ -15,7 +15,7 @@
  *     one of pickup/working/discovery/pivot/blocker/done/standby. The [project]
  *     tag is REQUIRED and must match the project the agent was dispatched for
  *     (`--project any` relaxes the value check but still requires a tag).
- *   - 20-60 words of plain English (standby may be shorter). John reads these;
+ *   - 20-60 words of plain English (standby may be shorter). The owner reads these;
  *     they are written for a business owner, not a developer:
  *       - no coder symbols (+ -> => & | < > # * ` ~ = _ @ \) — write the words
  *       - no bare acronyms or ALL-CAPS shorthand; teach shorthand as
@@ -60,7 +60,7 @@ const CODE_SYMBOLS = /[+&|<>*#`~=_@\\^]/;
 // All-caps tokens this length read as acronyms. Longer all-caps tokens
 // (CRITICAL, PASSED) read as emphasis on real words and are left alone.
 const ACRONYM = /\b[A-Z]{2,5}\b/g;
-// Shorthand John already knows; everything else gets spelled out first.
+// Shorthand the owner already knows; everything else gets spelled out first.
 const KNOWN_ACRONYMS = new Set(["AI", "CVB", "OK", "ID", "USD", "PDF", "URL", "HIGH", "LOW"]);
 
 function parseArgs(argv) {

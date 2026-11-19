@@ -10,9 +10,8 @@ work while you watch their progress on a live feed. Each teammate is a Claude Co
 agent with a persistent personality, its own memory files, and a lane it stays in —
 enforced by code, not vibes.
 
-This is the "starter" distribution of a personal system, shared privately with a small
-circle. It is real, daily-driven software — and also one person's system with sharp
-edges. Read "Sharp edges" before you judge it.
+This is the "starter" distribution of a personal system. It is real, daily-driven
+software — and also one person's system with sharp edges. Read "Sharp edges" before you judge it.
 
 ![The Bridge — dashboard chat with CVB, Big 5, spend, and the live feed](screenshots/The-Bridge.png)
 
@@ -179,14 +178,24 @@ pm2 save
 ```
 
 Remote access from your phone, without opening ports, via
-[Tailscale](https://tailscale.com) (free for personal use): install it, sign in, then
+[Tailscale](https://tailscale.com) (free for personal use). Only do this on a tailnet
+nobody else is on: `tailscale serve` hands the dashboard, with no login, to every
+device and person on your tailnet. Install it, sign in, then
 
 ```bash
 tailscale serve --bg --https 443 http://localhost:3900   # use your port if you changed it
 ```
 
+The dashboard only answers to names it knows, so tell it your Tailscale name (the
+`https://<machine>.<tailnet>.ts.net` address `tailscale serve` prints). Add it to
+`~/.aiteam/settings.json`, name only (it takes effect without a restart):
+
+```json
+"allowedHosts": ["my-pc.tail1234.ts.net"]
+```
+
 Tailscale's HTTPS tunnel state can be silently lost on service restarts. The watchdog
-re-asserts it every minute — run it under pm2 too:
+re-asserts it every 10 minutes — run it under pm2 too:
 
 ```bash
 pm2 start scripts/tunnel-watchdog.mjs --name tunnel-watchdog
@@ -214,13 +223,14 @@ Personas are plain markdown — editing a teammate's soul.md IS how you tune the
   supported (everything is Node; setup normalizes paths for your OS) but has had
   far fewer hours on it — if something misbehaves on a Mac, suspect a path or
   process quirk first and report it.
-- **Single-user by design.** One human, one machine, one team. No auth on the
-  dashboard — do not expose it to the open internet (Tailscale keeps it private).
-- **Prototype-grade codebase.** No tests. Expect to read code when something breaks.
+- **Single-user by design.** One human, one machine, one team. No login on the
+  dashboard, so it only listens on this computer (127.0.0.1) and turns away requests
+  from other websites. Do not expose it to the open internet (Tailscale keeps it private).
+- **Prototype-grade codebase.** Almost no tests (the front-door check has one). Expect to read code when something breaks.
 - **Your subscription is the fuel.** Heavy dispatching burns Claude usage. The
   dashboard shows per-model spend estimates so you can see what's happening.
-- **Don't redistribute.** Shared privately; ask before passing it on. No license is
-  attached.
+- **Sharing.** No license is attached, so the usual copyright rules apply: ask the
+  author before you redistribute it or build on it.
 
 ## FAQ
 

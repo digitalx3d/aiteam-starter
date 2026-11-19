@@ -44,7 +44,7 @@ export interface AgentListing {
   avatarUrl: string | null;
   /** Strengths / weaknesses / loves / hates one-liners. Phase 1: hardcoded; Phase 2 will move to a per-agent profile file. */
   profile: AgentProfile | null;
-  /** Set for static team members (John = "human", Claude = "orchestrator"). Drives the role badge in place of the model badge. */
+  /** Set for static team members (the owner = "human", Claude = "orchestrator"). Drives the role badge in place of the model badge. */
   role?: StaticRole;
 }
 
@@ -383,7 +383,7 @@ export async function getAgentDetail(name: string): Promise<AgentDetail | null> 
   // Safety: name must be a simple identifier (no traversal)
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) return null;
 
-  // Static team members (John, Claude). John is human-only (no persona files).
+  // Static team members (the owner, Claude). The owner is human-only (no persona files).
   // Claude (Von Braun) has full persona files at ~/.claude/agents/claude/ — read
   // them like any other agent but keep the static role/description metadata.
   const staticMember = staticTeamMembers().find((m) => m.name === name);

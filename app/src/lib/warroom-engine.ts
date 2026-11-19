@@ -78,7 +78,7 @@ export interface RosterConfigEntry {
   name: string;
   /** Claude model alias override for this member ("" / undefined = room default). */
   model?: string;
-  /** Extra role/context John typed for this session. */
+  /** Extra role/context the owner typed for this session. */
   extra?: string;
 }
 
@@ -403,7 +403,7 @@ function buildAgentMessage(
     );
   }
   if (interjection) {
-    parts.push("", `JOHN JUST SAID: "${interjection}" — take this into account.`);
+    parts.push("", `${getOwnerName().first.toUpperCase()} JUST SAID: "${interjection}" — take this into account.`);
   }
   parts.push("", roundInstruction(round, session.rounds, session.objective));
   if (ctx.angle) {
@@ -459,8 +459,8 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * If the session is paused, hold here (emitting "paused" status) until John
- * resumes, cancels, or wraps. Lets him read and type without the rounds racing
+ * If the session is paused, hold here (emitting "paused" status) until the owner
+ * resumes, cancels, or wraps. Lets them read and type without the rounds racing
  * ahead. Returns when it's safe to continue.
  */
 async function waitWhilePaused(id: string): Promise<void> {
@@ -1127,8 +1127,8 @@ async function runSession(id: string): Promise<void> {
     let live = getSessionSync(id);
     if (!live || live.cancelRequested || live.wrapRequested) break;
 
-    // Hold here if John paused. He reads / types; we resume on his click.
-    // Draining interjections AFTER the pause means anything he typed while
+    // Hold here if the owner paused. They read and type; we resume on their click.
+    // Draining interjections AFTER the pause means anything they typed while
     // paused folds into this very round.
     await waitWhilePaused(id);
     live = getSessionSync(id);
@@ -1205,7 +1205,7 @@ async function runSession(id: string): Promise<void> {
     }
   }
 
-  // Last chance for John to weigh in before the write-up (covers single-round
+  // Last chance for the owner to weigh in before the write-up (covers single-round
   // Lightning sessions, where there's no later round to catch a pause).
   await waitWhilePaused(id);
 

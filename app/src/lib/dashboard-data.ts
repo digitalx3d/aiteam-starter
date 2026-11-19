@@ -33,7 +33,7 @@ export interface CardItem {
 export interface TopProjectCard {
   slug: string;
   name: string;
-  /** Best signal of how recently John was active here. */
+  /** Best signal of how recently the owner was active here. */
   activityMs: number;
   /** Plain-language items: Big 3 first, then recent discussion, tasks last. */
   items: CardItem[];
@@ -62,7 +62,7 @@ function plainifyTaskTitle(title: string): string {
 
 /**
  * Assemble a card's items from the three sources in priority order, de-duping
- * by normalized text and capping the total. Big 3 (John's own notes) win ties;
+ * by normalized text and capping the total. Big 3 (the owner's own notes) win ties;
  * the task board is the last resort because its titles are agent-specific.
  */
 function buildCardItems(
@@ -168,7 +168,7 @@ export async function getTopActiveProjects(
         readProjectHistoryItems(p.slug),
       ]);
       const chatMtime = await sessionMtimeMs(p.path, p.slug);
-      // Editing the Big 3 is real activity too, so a project John just jotted a
+      // Editing the Big 3 is real activity too, so a project the owner just jotted a
       // reminder into surfaces even without chat/task churn.
       const activityMs = Math.max(
         latestTaskMtime(tasks),

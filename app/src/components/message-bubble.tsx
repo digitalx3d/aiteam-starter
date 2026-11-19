@@ -294,7 +294,7 @@ function makeMarkdownComponents(projectSlug?: string | null): Components {
 
 // react-markdown's default urlTransform strips URLs whose protocol isn't
 // http(s) / mailto / tel / etc. Windows absolute paths like
-// `Z:\GitHub\<project>\chat-images\foo.png` get filtered to "" because `Z:`
+// `C:\Code\<project>\chat-images\foo.png` get filtered to "" because `C:`
 // reads as an unknown protocol. We keep the safety net for anchors (so agent-
 // emitted text can't sneak `javascript:` URLs into <a href>) but rewrite our
 // own chat-images paths into served URLs before the default filter sees them.
@@ -563,7 +563,7 @@ function MessageBubbleInner({
   if (!hasContent && !hasApprovalBlocks) return null;
 
   // Never render the internal [Auto-notify] prompt vb-notifier injects to poke CVB.
-  // It's plumbing (meant for CVB, not John) and would otherwise show as John's bubble.
+  // It's plumbing (meant for CVB, not the owner) and would otherwise show as the owner's bubble.
   // Filtering here (not just at hydration) also clears any copy already cached locally.
   if (isUser && combinedText.startsWith("[Auto-notify]")) return null;
 
@@ -573,7 +573,7 @@ function MessageBubbleInner({
     !message.pending &&
     (hasToolCalls || (message.traceEvents?.length ?? 0) > 0);
 
-  // John's posts get a recessed (darker) background — a shade below the base, distinct from sidebars.
+  // The owner's posts get a recessed (darker) background — a shade below the base, distinct from sidebars.
   // Claude's posts sit on the base. The two-level shift makes whose-post-is-whose obvious without bubbles.
   const rowBg = isUser ? "bg-user-bg" : "bg-background";
 

@@ -11,7 +11,7 @@ import { getConfig } from "./config";
  * Source of truth: ~/.claude/projects/<encoded-cwd>/**\/*.jsonl session logs.
  * Same parsing rules as project-costs.ts: dedupe by message id (a turn streams
  * the same usage block on several events), price from the shared table.
- * "Spend" is what the usage WOULD cost at API list prices — John is on a
+ * "Spend" is what the usage WOULD cost at API list prices — the owner is on a
  * subscription, so this is a consumption gauge, not an invoice.
  *
  * Cost control: files whose mtime predates the month can't contain this

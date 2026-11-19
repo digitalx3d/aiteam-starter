@@ -9,7 +9,7 @@
   --foreground: #f3f3f3;
   --muted: #b0b0b0;
   --muted-bg: #5e5e5e;
-  --user-bg: #3a3a3a;          /* recessed — for John's chat posts, distinct from base + sidebars */
+  --user-bg: #3a3a3a;          /* recessed — for the owner's chat posts, distinct from base + sidebars */
   --cards-bg: #282828;         /* dashboard panel — value ~40 */
   --card-bg: #3a3a3a;          /* individual card surface — subtle elevation above panel */
   --border: #6e6e6e;

@@ -131,8 +131,8 @@ async function askQuestions(existingSettings) {
 // ---------- token rendering ----------
 function makeTokens(a) {
   // Claude Code names each project's session/memory folder after its path,
-  // with separators and colons flattened to dashes (Z:\GitHub\aiTeam →
-  // Z--GitHub-aiTeam). CVB's auto-memory lives under that folder.
+  // with separators and colons flattened to dashes (C:\Code\aiTeam →
+  // C--Code-aiTeam). CVB's auto-memory lives under that folder.
   const projectSlug = REPO.replace(/[\\/:]/g, "-");
   return {
     "{{OWNER_NAME}}": a.ownerName,

@@ -30,7 +30,7 @@ interface InboxBadgeProps {
  *
  * Sources of truth:
  *  - /api/inbox: list of entry ids (server-side, polled every 30s + on focus)
- *  - localStorage `aiteam.inbox.readIds`: which ids John has marked read
+ *  - localStorage `aiteam.inbox.readIds`: which ids the owner has marked read
  *
  * When the inbox page mutates the read set, it dispatches a same-tab custom
  * event (storage events don't fire in the writing tab) so this badge updates

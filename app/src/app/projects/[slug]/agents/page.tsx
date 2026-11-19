@@ -14,7 +14,7 @@ interface PageProps {
 const MAX_FINISHED_SEED = 20;
 
 export default async function ProjectAgentsPage({ params }: PageProps) {
-  // Decode once here: ticket.project is stored decoded (e.g. "Peg Slideshow"),
+  // Decode once here: ticket.project is stored decoded (e.g. "My Project"),
   // so comparing it against the raw encoded params.slug below would silently
   // never match for project names with spaces or other special characters.
   const { slug: rawSlug } = await params;
