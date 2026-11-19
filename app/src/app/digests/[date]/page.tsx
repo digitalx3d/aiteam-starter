@@ -44,7 +44,7 @@ export default async function DigestPage({ params }: PageProps) {
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-tight text-foreground leading-snug">
-              Indy&apos;s Digest
+              Research digest
             </h1>
             <p className="text-sm text-muted mt-0.5">
               {new Intl.DateTimeFormat("en-US", {

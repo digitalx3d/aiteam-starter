@@ -93,7 +93,7 @@ export interface ProjectStats {
 }
 
 /** Lives next to settings.json in ~/.aiteam/, the per-machine runtime-state home
- *  (alongside hidden-projects.json and location.json). Deliberately NOT inside
+ *  (alongside hidden-projects.json). Deliberately NOT inside
  *  getConfig().aiteamDir — that points at the aiTeam repo, and this is generated
  *  runtime data that must never be committed or shared between machines. */
 function storePath(): string {

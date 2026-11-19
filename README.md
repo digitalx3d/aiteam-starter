@@ -224,6 +224,10 @@ Windows, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-pm2-
 registers that one task (check it after a restart with `scripts/verify-startup.ps1`); on
 Mac or Linux, run `pm2 startup` and follow what it prints.
 
+Heads up on Windows: if your machine already has a `PM2` entry under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, the setup script removes it so pm2
+doesn't start twice, and saves a copy to `~/.aiteam/pm2-run-key.backup.txt` first.
+
 After you pull an update, rebuild and restart with `node scripts/deploy-dashboard.mjs`.
 It refuses while a teammate is mid-task, because a restart would kill them; add
 `--force` to deploy anyway.

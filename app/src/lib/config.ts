@@ -70,7 +70,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     key: "vaultDir",
     label: "Vault",
     description:
-      "The Obsidian vault — session transcripts, rolling primers, Indy's digests, and decisions are read and written here.",
+      "The Obsidian vault. Session transcripts, rolling primers, research digests and decisions are read and written here.",
     envVar: "VAULT_DIR",
     kind: "dir",
     defaultValue: () => path.resolve(process.cwd(), "..", "..", "vault"),

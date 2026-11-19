@@ -20,11 +20,11 @@ export async function ResearchCard() {
 
   return (
     <section>
-      <SectionHeader icon={FileText} title="Indy's research" />
+      <SectionHeader icon={FileText} title="Research digests" />
 
       {!latest ? (
         <div className="rounded-lg border border-border bg-card-bg p-4 text-xs text-muted">
-          No digests yet. Indy runs Mon + Thu at 7am.
+          No digests yet.
         </div>
       ) : (
         <Link

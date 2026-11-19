@@ -21,7 +21,7 @@ export default async function DigestsListPage() {
         </div>
         <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
           <FileText className="h-5 w-5 text-accent" />
-          Indy&apos;s research digests
+          Research digests
         </h1>
         <p className="text-xs text-muted mt-1">
           {digests.length} digest{digests.length === 1 ? "" : "s"} archived at{" "}
@@ -31,7 +31,7 @@ export default async function DigestsListPage() {
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 max-w-4xl">
         {digests.length === 0 ? (
           <p className="text-sm text-muted">
-            No digests yet. Indy runs Mon + Thu at 7am.
+            No digests yet. Any digest saved to that folder shows up here.
           </p>
         ) : (
           <ul className="space-y-3">
