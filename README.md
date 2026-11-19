@@ -1,7 +1,7 @@
 # aiTeam Starter
 
 A persistent multi-agent AI team you run on your own machine — with names, faces, and a
-control center.
+control center.  All agents mentioned below can and should be customized (by you) to suit your needs.
 
 You don't talk to "Claude". You talk to **Claude Von Braun** (CVB), your orchestrator,
 on a dashboard. He writes briefs and dispatches **Maya Solo** (visual design),
@@ -10,8 +10,14 @@ work while you watch their progress on a live feed. Each teammate is a Claude Co
 agent with a persistent personality, its own memory files, and a lane it stays in —
 enforced by code, not vibes.
 
+<<<<<<< HEAD
 This is the "starter" distribution of a personal system. It is real, daily-driven
 software — and also one person's system with sharp edges. Read "Sharp edges" before you judge it.
+=======
+This is the "starter" distribution of a personal system, shared privately with a small
+circle. It is real, daily-driven software — and also one person's system with sharp
+edges. Read "Sharp edges" before you judge it.  (It is a work in progress.)
+>>>>>>> origin/main
 
 ![The Bridge — dashboard chat with CVB, Big 5, spend, and the live feed](screenshots/The-Bridge.png)
 
