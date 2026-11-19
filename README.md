@@ -174,11 +174,22 @@ Then:
 
 ```bash
 cd app
-npm run dev
+npm run build
+npm start
 ```
 
 Open http://localhost:3900 (or the port you chose), visit the **Team** page to meet
 everyone, and say hello to CVB on the Dashboard.
+
+That is the everyday way to run it: build once, then `npm start`. Run `npm run build`
+again after you pull an update. For an always-on setup that restarts itself, use the
+pm2 recipe in "Running it for real" below instead.
+
+Use `npm run dev` only while you are changing the app's code. Development mode
+reloads as you edit, but it also switches on Next.js's developer tools, and some of
+those answer requests before the dashboard's own safety checks run. A web page you
+happen to have open could, for example, make your code editor pop open files. Don't
+leave it running day to day.
 
 The port lives in `~/.aiteam/settings.json` as `appPort`; the app scripts, pm2
 config, dispatch courier, and tunnel watchdog all follow it, so there is exactly

@@ -7,6 +7,11 @@ import { getExtraAllowedHosts } from "@/lib/config";
 // runtime, before every matched route. The rules and why they exist are in
 // lib/request-guard.ts. Runs on pages as well as /api, so a rebound page
 // cannot read the dashboard either; only build assets skip it.
+// /_next/image is guarded too (Ethan N-2): the optimizer is a route that
+// answers requests, not a static file. The dashboard does not use next/image.
+// If you add it, note that the optimizer's own internal fetch of a local
+// image arrives with no Host header and the guard refuses it; serve images
+// with a plain <img> or set `unoptimized` rather than loosening the guard.
 
 let loggedHosts = false;
 
@@ -38,5 +43,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: ["/((?!_next/static).*)"],
 };
